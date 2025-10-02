@@ -200,7 +200,7 @@ int main() {
 
     unsigned k = 4;
     unsigned n = 8;
-    unsigned kn = 1;
+    unsigned kn = 4;
     unsigned field = 251;
 
     unsigned shareWidth = width;
