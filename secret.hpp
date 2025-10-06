@@ -23,6 +23,8 @@ struct Field {
     virtual storage_type mul(storage_type a, storage_type b) const noexcept = 0;
     virtual storage_type pow(storage_type a, std::uint64_t e) const = 0;
     virtual storage_type inv(storage_type a) const = 0;
+
+    virtual std::uint64_t getOrder() const = 0;
     
     storage_type evaluatePolynomial(const std::vector<storage_type>& coefficients, storage_type x) const;
     std::vector<storage_type> mul_by_x_minus_a(const std::vector<storage_type>& poly, storage_type a) const;
@@ -44,6 +46,8 @@ struct PrimeField : public Field<Storage> {
     storage_type mul(storage_type a, storage_type b) const noexcept override;
     storage_type pow(storage_type a, std::uint64_t e) const override;
     storage_type inv(storage_type a) const override;
+
+    std::uint64_t getOrder() const override { return p; }
     
     bool is_binary_field() const noexcept override { return false; }
 };
@@ -63,12 +67,14 @@ struct BinaryField : public Field<Storage> {
     storage_type mul(storage_type a, storage_type b) const noexcept override;
     storage_type pow(storage_type a, std::uint64_t e) const override;
     storage_type inv(storage_type a) const override;
+
+    std::uint64_t getOrder() const override { return static_cast<std::uint64_t>(1) << m; }
     
     bool is_binary_field() const noexcept override { return true; }
 };
 
 template<typename Storage>
-std::vector<std::vector<Storage>> getShares(const std::vector<Storage>& data, unsigned k, unsigned n, const Field<Storage>& F, unsigned kn = 1);
+std::vector<std::vector<Storage>> getShares(const std::vector<Storage>& data, unsigned k, unsigned n, const Field<Storage>& F, unsigned kn = 1, bool clampToOrder = true);
 
 template<typename Storage>
 std::vector<Storage> reconstructFromShares(const std::vector<std::vector<Storage>>& shares, const std::vector<Storage>& x_values, unsigned k, const Field<Storage>& F, unsigned kn = 1, std::size_t expected_size = static_cast<std::size_t>(-1));

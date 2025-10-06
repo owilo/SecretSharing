@@ -159,7 +159,7 @@ typename BinaryField<Storage>::storage_type BinaryField<Storage>::inv(storage_ty
 // Secret sharing
 
 template<typename Storage>
-std::vector<std::vector<Storage>> getShares(const std::vector<Storage>& data, unsigned k, unsigned n, const Field<Storage>& F, unsigned kn) {
+std::vector<std::vector<Storage>> getShares(const std::vector<Storage>& data, unsigned k, unsigned n, const Field<Storage>& F, unsigned kn, bool clampToOrder) {
     if (k == 0 || n == 0) throw std::invalid_argument("k and n must be > 0");
     if (kn == 0 || kn > k) throw std::invalid_argument("kn must satisfy 1 <= kn <= k");
     
@@ -192,7 +192,12 @@ std::vector<std::vector<Storage>> getShares(const std::vector<Storage>& data, un
         for (unsigned j = 0; j < kn; ++j) {
             if (dataCursor < data.size()) {
                 Storage value = data[dataCursor++];
-                if (!F.is_binary_field()) {
+                if (clampToOrder) {
+                    auto order = F.getOrder();
+                    if (static_cast<std::uint64_t>(value) >= order) {
+                        value = static_cast<Storage>(order - 1);
+                    }
+                } else if (!F.is_binary_field()) {
                     const auto& PF = static_cast<const PrimeField<Storage>&>(F);
                     auto v = static_cast<std::uint64_t>(value);
                     if (v >= PF.p) v = v % PF.p;
@@ -309,9 +314,9 @@ template class BinaryField<std::uint16_t>;
 template class BinaryField<std::uint32_t>;
 
 // Secret sharing function instantiations
-template std::vector<std::vector<std::uint8_t>> getShares<std::uint8_t>(const std::vector<std::uint8_t>&, unsigned, unsigned, const Field<std::uint8_t>&, unsigned);
-template std::vector<std::vector<std::uint16_t>> getShares<std::uint16_t>(const std::vector<std::uint16_t>&, unsigned, unsigned, const Field<std::uint16_t>&, unsigned);
-template std::vector<std::vector<std::uint32_t>> getShares<std::uint32_t>(const std::vector<std::uint32_t>&, unsigned, unsigned, const Field<std::uint32_t>&, unsigned);
+template std::vector<std::vector<std::uint8_t>> getShares<std::uint8_t>(const std::vector<std::uint8_t>&, unsigned, unsigned, const Field<std::uint8_t>&, unsigned, bool);
+template std::vector<std::vector<std::uint16_t>> getShares<std::uint16_t>(const std::vector<std::uint16_t>&, unsigned, unsigned, const Field<std::uint16_t>&, unsigned, bool);
+template std::vector<std::vector<std::uint32_t>> getShares<std::uint32_t>(const std::vector<std::uint32_t>&, unsigned, unsigned, const Field<std::uint32_t>&, unsigned, bool);
 
 template std::vector<std::uint8_t> reconstructFromShares<std::uint8_t>(const std::vector<std::vector<std::uint8_t>>&, const std::vector<std::uint8_t>&, unsigned, const Field<std::uint8_t>&, unsigned, std::size_t);
 template std::vector<std::uint16_t> reconstructFromShares<std::uint16_t>(const std::vector<std::vector<std::uint16_t>>&, const std::vector<std::uint16_t>&, unsigned, const Field<std::uint16_t>&, unsigned, std::size_t);
