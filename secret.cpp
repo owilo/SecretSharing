@@ -106,9 +106,6 @@ template<typename Storage>
 BinaryField<Storage>::BinaryField(std::uint64_t red_poly_with_top_bit, unsigned m_deg)
     : reduction_polynomial(red_poly_with_top_bit), m(m_deg) {
     if (m == 0 || m > (8 * sizeof(Storage))) throw std::invalid_argument("Invalid extension degree m");
-    if (((reduction_polynomial >> m) & 1ULL) == 0) {
-        throw std::invalid_argument("reduction_polynomial must include the x^m top bit (e.g. 0x11B for m=8)");
-    }
 }
 
 template<typename Storage>
@@ -174,15 +171,21 @@ std::vector<std::vector<Storage>> getShares(const std::vector<Storage>& data, un
 
     std::random_device dev;
     std::mt19937_64 rng(dev());
-    std::uniform_int_distribution<std::uint64_t> dist(0, [&]() -> std::uint64_t {
-        if (F.is_binary_field()) {
-            const auto& BF = static_cast<const BinaryField<Storage>&>(F);
-            return (1ULL << BF.m) - 1ULL;
+    
+    std::uint64_t max_val;
+    if (F.is_binary_field()) {
+        const auto& BF = static_cast<const BinaryField<Storage>&>(F);
+        if (BF.m >= 64) {
+            max_val = std::numeric_limits<std::uint64_t>::max();
         } else {
-            const auto& PF = static_cast<const PrimeField<Storage>&>(F);
-            return PF.p - 1;
+            max_val = (1ULL << BF.m) - 1ULL;
         }
-    }());
+    } else {
+        const auto& PF = static_cast<const PrimeField<Storage>&>(F);
+        max_val = PF.p - 1;
+    }
+
+    std::uniform_int_distribution<std::uint64_t> dist(0, max_val);
 
     unsigned dataCursor = 0;
     for (unsigned block = 0; block < shareSize; ++block) {
