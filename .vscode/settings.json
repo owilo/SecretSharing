@@ -64,6 +64,15 @@
         "codecvt": "cpp",
         "fstream": "cpp",
         "iomanip": "cpp",
-        "sstream": "cpp"
+        "sstream": "cpp",
+        "__bit_reference": "cpp",
+        "__functional_base": "cpp",
+        "__node_handle": "cpp",
+        "__memory": "cpp",
+        "filesystem": "cpp",
+        "locale": "cpp",
+        "__tree": "cpp",
+        "queue": "cpp",
+        "stack": "cpp"
     }
 }
