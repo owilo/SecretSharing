@@ -13,6 +13,10 @@
 
 namespace ss {
 
+static constexpr std::uint64_t irr[32] = {
+    0x3, 0x7, 0xb, 0x13, 0x25, 0x43, 0x83, 0x11b, 0x203, 0x409, 0x805, 0x1009, 0x201b, 0x4021, 0x8003, 0x1002b, 0x20003, 0x40009, 0x80027, 0x100009, 0x200005, 0x400003, 0x800021, 0x100001b, 0x2000009, 0x400001b, 0x8000027, 0x10000003, 0x20000005, 0x40000003, 0x80000009, 0x10000008d
+};
+
 double computePSNR(const std::vector<std::uint8_t>& orig, const std::vector<std::uint8_t>& recon) {
     if (orig.size() != recon.size()) {
         throw std::invalid_argument("Vectors must be the same size for PSNR computation");
@@ -103,8 +107,8 @@ typename PrimeField<Storage>::storage_type PrimeField<Storage>::inv(storage_type
 // BinaryField definitions
 
 template<typename Storage>
-BinaryField<Storage>::BinaryField(std::uint64_t red_poly_with_top_bit, unsigned m_deg)
-    : reduction_polynomial(red_poly_with_top_bit), m(m_deg) {
+BinaryField<Storage>::BinaryField(unsigned m_deg)
+    : m(m_deg) {
     if (m == 0 || m > (8 * sizeof(Storage))) throw std::invalid_argument("Invalid extension degree m");
 }
 
@@ -124,10 +128,10 @@ typename BinaryField<Storage>::storage_type BinaryField<Storage>::mul(storage_ty
         bb >>= 1;
         aa <<= 1;
     }
-    // reduce modulo the polynomial
+    // Reduce modulo the polynomial
     for (int bit = static_cast<int>(2 * m - 2); bit >= static_cast<int>(m); --bit) {
         if (res & (static_cast<U>(1) << bit)) {
-            res ^= (static_cast<U>(reduction_polynomial) << (bit - static_cast<int>(m)));
+            res ^= (static_cast<U>(irr[m - 1]) << (bit - static_cast<int>(m)));
         }
     }
     U mask = ((static_cast<U>(1) << m) - 1u);

@@ -56,11 +56,9 @@ struct PrimeField : public Field<Storage> {
 template<typename Storage>
 struct BinaryField : public Field<Storage> {
     using typename Field<Storage>::storage_type;
-
-    std::uint64_t reduction_polynomial;
     unsigned m;
 
-    BinaryField(std::uint64_t red_poly_with_top_bit, unsigned m_deg);
+    BinaryField(unsigned m_deg);
     
     storage_type add(storage_type a, storage_type b) const noexcept override;
     storage_type sub(storage_type a, storage_type b) const noexcept override { return add(a, b); }

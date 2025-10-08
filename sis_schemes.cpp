@@ -165,12 +165,12 @@ int main() {
     runScheme("Shamir GF(251)", ss::PrimeField<std::uint8_t>(251), n, k, 1, secret_pixels, secret_size, width, height, "results/shamir251", true, false);
 
     // 2) Shamir GF(2^8) (AES poly 0x11B) kn = 1
-    runScheme("Shamir GF(2^8)", ss::BinaryField<std::uint8_t>(0x11B, 8), n, k, 1, secret_pixels, secret_size, width, height, "results/shamir256", true, false);
+    runScheme("Shamir GF(2^8)", ss::BinaryField<std::uint8_t>(8), n, k, 1, secret_pixels, secret_size, width, height, "results/shamir256", true, false);
 
     // 3) Thien-Lin GF(251) (kn = 4)
     runScheme("Thien-Lin GF(251)", ss::PrimeField<std::uint8_t>(251), n, k, 4, secret_pixels, secret_size, width, height, "results/thienlin251", false, true);
 
     // 4) Thien-Lin GF(2^8) (kn = 4)
-    runScheme("Thien-Lin GF(2^8)", ss::BinaryField<std::uint8_t>(0x11B, 8), n, k, 4, secret_pixels, secret_size, width, height, "results/thienlin256", false, true);
+    runScheme("Thien-Lin GF(2^8)", ss::BinaryField<std::uint8_t>(8), n, k, 4, secret_pixels, secret_size, width, height, "results/thienlin256", false, true);
     return 0;
 }
