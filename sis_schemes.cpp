@@ -85,11 +85,7 @@ void runScheme(const std::string &label,
     int share_h = divide_share_height_by_k ? (height / k) : height;
     for (size_t i = 0; i < shares.size(); ++i) {
         std::string outp = result_prefix + "/shadows/shadow_" + std::to_string(i+1) + ".png";
-        if (!saveGrayPNG(outp, shares[i], width, share_h)) {
-            std::cerr << "Failed to save " << outp << "\n";
-        } else {
-            std::cout << "Saved " << outp << "\n";
-        }
+        saveGrayPNG(outp, shares[i], width, share_h);
     }
 
     std::vector<unsigned> idxA(k);
@@ -108,11 +104,7 @@ void runScheme(const std::string &label,
         std::vector<std::uint8_t> xs;
         selectSharesAndXs(shares, indices, sel, xs);
         auto rec = ss::reconstructFromShares<std::uint8_t>(sel, xs, rec_k, field, kn, static_cast<unsigned>(secret_size));
-        if (!saveGrayPNG(out_path, rec, width, height)) {
-            std::cerr << "Failed to save " << out_path << "\n";
-        } else {
-            std::cout << "Saved " << out_path << "\n";
-        }
+        saveGrayPNG(out_path, rec, width, height);
         return rec;
     };
 
@@ -131,22 +123,18 @@ void runScheme(const std::string &label,
         recF = reconstructAndSave(idxF, recF_path, k_fail);
     }
 
-    // PSNRs
-    std::cout << "\nPSNRs for " << label << " reconstructions:\n";
-    try {
-        double p1 = ss::computePSNR(secret_vec, recA);
-        std::cout << "  " << recA_path << ": " << p1 << " dB\n";
-    } catch (...) { std::cout << "  PSNR compute failed for " << recA_path << "\n"; }
-    try {
-        double p2 = ss::computePSNR(secret_vec, recB);
-        std::cout << "  " << recB_path << ": " << p2 << " dB\n";
-    } catch (...) { std::cout << "  PSNR compute failed for " << recB_path << "\n"; }
+    std::cout << "  " << recA_path << " | PSNR : " << ss::computePSNR(secret_vec, recA) << " dB | NPCR : " << ss::computeNPCR(secret_vec, recA) << "% | UACI : " << ss::computeUACI(secret_vec, recA) << "%\n";
+    std::cout << "  " << recB_path << " | PSNR : " << ss::computePSNR(secret_vec, recB) << " dB | NPCR : " << ss::computeNPCR(secret_vec, recB) << "% | UACI : " << ss::computeUACI(secret_vec, recB) << "%\n";
     if (do_failed_experiment) {
-        try {
-            double pf = ss::computePSNR(secret_vec, recF);
-            std::cout << "  " << recF_path << ": " << pf << " dB\n";
-        } catch (...) { std::cout << "  PSNR compute failed for " << recF_path << "\n"; }
+        std::cout << "  " << recF_path << " | PSNR : " << ss::computePSNR(secret_vec, recF) << " dB | NPCR : " << ss::computeNPCR(secret_vec, recF) << "% | UACI : " << ss::computeUACI(secret_vec, recF) << "%\n";
     }
+
+    if (kn == 1) {
+        std::string share1_path = result_prefix + "/shadows/shadow_1.png";
+        const auto &share1 = shares[0];
+        std::cout << "  " << share1_path << " | PSNR : " << ss::computePSNR(secret_vec, share1) << " dB | NPCR: " << ss::computeNPCR(secret_vec, share1) << "% | UACI: " << ss::computeUACI(secret_vec, share1) << "%\n";
+    }
+
 }
 
 int main() {
