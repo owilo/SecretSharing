@@ -17,7 +17,7 @@
 namespace fs = std::filesystem;
 
 bool saveGrayPNG(const std::string &path, const std::vector<std::uint8_t> &pixels, int w, int h) {
-    if ((size_t)w * (size_t)h != pixels.size()) {
+    if ((static_cast<std::size_t>(w) * h) != pixels.size()) {
         std::cerr << "Warning: pixel buffer size (" << pixels.size() << ") != w*h (" << (w*h) << ").\n";
         std::vector<std::uint8_t> tmp((size_t)w * (size_t)h, 0);
         size_t copy = std::min(tmp.size(), pixels.size());
