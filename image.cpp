@@ -1,15 +1,12 @@
 #include "image.hpp"
 
-#include <algorithm>
-#include <cmath>
-#include <limits>
-
-namespace ss {
-
 #include <vector>
 #include <cstdint>
 #include <algorithm>
 #include <cmath>
+#include <fstream>
+
+namespace ss {
 
 std::vector<std::uint8_t> stretchHistogram(
     const std::vector<std::uint8_t>& image,
@@ -51,6 +48,35 @@ std::vector<std::uint8_t> stretchHistogram(
         result.push_back(newValue);
     }
 
+    return result;
+}
+
+std::array<unsigned, 256> computeHistogram(const std::vector<std::uint8_t>& image) {
+    std::array<unsigned, 256> hist = {};
+    for (const auto &p : image) {
+        ++hist[p];
+    }
+    return hist;
+}
+
+bool saveHistogram(std::string path, const std::array<unsigned, 256>& histogram) {
+    std::ofstream ofs(path);
+    if (!ofs.is_open()) {
+        return false;
+    }
+
+    for (size_t i = 0; i < histogram.size(); ++i) {
+        ofs << i << " " << histogram[i] << "\n";
+    }
+    return true;
+}
+
+std::vector<std::uint8_t> clampPixels(const std::vector<std::uint8_t>& image, std::uint8_t min_val, std::uint8_t max_val) {
+    std::vector<std::uint8_t> result;
+    result.reserve(image.size());
+    for (const auto &p : image) {
+        result.push_back(std::clamp(p, min_val, max_val));
+    }
     return result;
 }
 

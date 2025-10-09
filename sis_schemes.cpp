@@ -69,15 +69,21 @@ void runScheme(const std::string &label,
                int height,
                const std::string &result_prefix,
                bool do_failed_experiment = false,
-               bool divide_share_height_by_k = false)
+               bool divide_share_height_by_k = false,
+               bool clampToField = true)
 {
     std::cout << "\n--- " << label << " (n=" << n << ", k=" << k << ", kn=" << kn << ") ---\n";
 
     fs::create_directories(result_prefix + "/shadows");
 
-    std::vector<std::uint8_t> hist_vec = ss::stretchHistogram(secret_vec, 0, 255, 0, field.getOrder() - 1);
+    std::vector<std::uint8_t> field_vec;
+    if (clampToField) {
+        field_vec = ss::clampPixels(secret_vec, 0, static_cast<std::uint8_t>(field.getOrder() - 1));
+    } else {
+        field_vec = ss::stretchHistogram(secret_vec, 0, 255, 0, field.getOrder() - 1);
+    }
 
-    auto shares = ss::getShares<std::uint8_t>(hist_vec, k, n, field, kn);
+    auto shares = ss::getShares<std::uint8_t>(field_vec, k, n, field, kn);
     if (shares.size() != n) {
         std::cerr << "Warning: getShares returned " << shares.size() << " shares (expected " << n << ")\n";
     }
@@ -107,6 +113,8 @@ void runScheme(const std::string &label,
         saveGrayPNG(out_path, rec, width, height);
         return rec;
     };
+
+    ss::saveHistogram(result_prefix + "/histogram.dat", ss::computeHistogram(field_vec));
 
     std::string recA_path = result_prefix + "/reconstruction1.png";
     auto recA = reconstructAndSave(idxA, recA_path, k);
