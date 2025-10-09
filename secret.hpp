@@ -8,8 +8,6 @@
 
 namespace ss {
 
-double computePSNR(const std::vector<std::uint8_t>& orig, const std::vector<std::uint8_t>& recon);
-
 // Galois Field interface
 template<typename Storage>
 struct Field {

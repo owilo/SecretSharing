@@ -12,6 +12,7 @@
 #include "stb_image_write.h"
 
 #include "secret.hpp"
+#include "image.hpp"
 
 namespace fs = std::filesystem;
 
@@ -74,7 +75,9 @@ void runScheme(const std::string &label,
 
     fs::create_directories(result_prefix + "/shadows");
 
-    auto shares = ss::getShares<std::uint8_t>(secret_vec, k, n, field, kn);
+    std::vector<std::uint8_t> hist_vec = ss::stretchHistogram(secret_vec, 0, 255, 0, field.getOrder() - 1);
+
+    auto shares = ss::getShares<std::uint8_t>(hist_vec, k, n, field, kn);
     if (shares.size() != n) {
         std::cerr << "Warning: getShares returned " << shares.size() << " shares (expected " << n << ")\n";
     }
