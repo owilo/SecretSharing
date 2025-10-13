@@ -12,6 +12,8 @@ std::vector<std::uint8_t> stretchHistogram(const std::vector<std::uint8_t>& imag
 
 std::array<unsigned, 256> computeHistogram(const std::vector<std::uint8_t>& image);
 
+double computeEntropyPerPixel(const std::vector<std::uint8_t>& image);
+
 std::vector<std::uint8_t> clampPixels(const std::vector<std::uint8_t>& image, std::uint8_t min_val, std::uint8_t max_val);
 
 bool saveHistogram(std::string path, const std::array<unsigned, 256>& histogram);

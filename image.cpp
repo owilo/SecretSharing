@@ -71,6 +71,23 @@ bool saveHistogram(std::string path, const std::array<unsigned, 256>& histogram)
     return true;
 }
 
+double computeEntropyPerPixel(const std::vector<std::uint8_t>& image) {
+    auto hist = computeHistogram(image);
+    const double total = static_cast<double>(image.size());
+    if (total == 0.0) {
+        return 0.0;
+    }
+
+    double entropy = 0.0;
+    for (const auto &count : hist) {
+        if (count > 0) {
+            double p = static_cast<double>(count) / total;
+            entropy -= p * std::log2(p);
+        }
+    }
+    return entropy;
+}
+
 std::vector<std::uint8_t> clampPixels(const std::vector<std::uint8_t>& image, std::uint8_t min_val, std::uint8_t max_val) {
     std::vector<std::uint8_t> result;
     result.reserve(image.size());
