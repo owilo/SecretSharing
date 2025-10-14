@@ -1,15 +1,16 @@
 #include "secret.hpp"
 
-#include <vector>
-#include <cstdint>
 #include <cstddef>
-#include <stdexcept>
-#include <random>
-#include <type_traits>
-#include <limits>
+#include <cstdint>
 #include <cmath>
-#include <algorithm>
 #include <iostream>
+#include <limits>
+#include <random>
+#include <stdexcept>
+#include <type_traits>
+#include <unordered_set>
+#include <vector>
+#include <algorithm>
 
 namespace ss {
 
@@ -143,63 +144,70 @@ typename BinaryField<Storage>::storage_type BinaryField<Storage>::inv(storage_ty
 // Secret sharing
 
 template<typename Storage, typename CoeffGenerator>
-std::vector<std::vector<Storage>> getSharesHelper(
-    const std::vector<Storage>& data, 
-    unsigned k, 
-    unsigned n, 
-    const Field<Storage>& F, 
-    unsigned kn, 
-    bool clampToOrder,
-    CoeffGenerator coeffGenerator
+static std::vector<std::vector<Storage>> getSharesHelper(
+    const std::vector<Storage>& data,
+    unsigned k,
+    unsigned n,
+    const Field<Storage>& F,
+    unsigned kn,
+    CoeffGenerator coeffGenerator,
+    const std::vector<Storage>& evalPoints
 ) {
     if (k == 0 || n == 0) throw std::invalid_argument("k and n must be > 0");
     if (kn == 0 || kn > k) throw std::invalid_argument("kn must satisfy 1 <= kn <= k");
-    
+
     if (F.is_binary_field()) {
         const auto& BF = static_cast<const BinaryField<Storage>&>(F);
-        if (n > ((1ULL << BF.m) - 1ULL)) throw std::invalid_argument("n too large for field size");
+        if (n > ((1ULL << BF.m) - 1ULL))
+            throw std::invalid_argument("n too large for field size");
+    }
+
+    if (!evalPoints.empty()) {
+        if (evalPoints.size() != n)
+            throw std::invalid_argument("evalPoints size must equal n");
+
+        std::unordered_set<std::uint64_t> seen;
+        std::uint64_t order = F.getOrder();
+        for (auto x : evalPoints) {
+            std::uint64_t xv = static_cast<std::uint64_t>(x);
+            if (xv == 0) throw std::invalid_argument("evaluation points must be non-zero");
+            if (xv >= order) throw std::invalid_argument("evaluation point out of field range");
+            if (!seen.insert(xv).second)
+                throw std::invalid_argument("evaluation points must be distinct");
+        }
     }
 
     const unsigned shareSize = static_cast<unsigned>((data.size() + kn - 1) / kn);
     std::vector<std::vector<Storage>> shares(n);
-    for (unsigned i = 0; i < n; ++i) shares[i].reserve(shareSize);
+    for (auto &v : shares) v.reserve(shareSize);
 
     std::random_device dev;
     std::mt19937_64 rng(dev());
-    
+
     std::uint64_t max_val;
     if (F.is_binary_field()) {
         const auto& BF = static_cast<const BinaryField<Storage>&>(F);
-        if (BF.m >= 64) {
-            max_val = std::numeric_limits<std::uint64_t>::max();
-        } else {
-            max_val = (1ULL << BF.m) - 1ULL;
-        }
+        max_val = (BF.m >= 64) ? std::numeric_limits<std::uint64_t>::max() : ((1ULL << BF.m) - 1ULL);
     } else {
         const auto& PF = static_cast<const PrimeField<Storage>&>(F);
         max_val = PF.p - 1;
     }
-
     std::uniform_int_distribution<std::uint64_t> dist(0, max_val);
 
     unsigned dataCursor = 0;
     for (unsigned block = 0; block < shareSize; ++block) {
-        // Get polynomial coefficients from the provided generator
-        std::vector<Storage> polyCoeffs = coeffGenerator(k, kn, rng, dist);
-        
-        // Pack secret data into the first kn coefficients
+        auto polyCoeffs = coeffGenerator(k, kn, rng, dist);
+
+        // Pack secret data into coefficients
         for (unsigned j = 0; j < kn; ++j) {
             if (dataCursor < data.size()) {
                 Storage value = data[dataCursor++];
-                if (clampToOrder) {
-                    auto order = F.getOrder();
-                    if (static_cast<std::uint64_t>(value) >= order) {
-                        value = static_cast<Storage>(order - 1);
-                    }
-                } else if (!F.is_binary_field()) {
+
+                // Reduce mod field prime
+                if (!F.is_binary_field()) {
                     const auto& PF = static_cast<const PrimeField<Storage>&>(F);
-                    auto v = static_cast<std::uint64_t>(value);
-                    if (v >= PF.p) v = v % PF.p;
+                    std::uint64_t v = static_cast<std::uint64_t>(value);
+                    if (v >= PF.p) v %= PF.p;
                     value = static_cast<Storage>(v);
                 }
                 polyCoeffs[j] = value;
@@ -210,7 +218,7 @@ std::vector<std::vector<Storage>> getSharesHelper(
 
         // Evaluate polynomial
         for (unsigned j = 0; j < n; ++j) {
-            Storage x = static_cast<Storage>(j + 1);
+            Storage x = evalPoints.empty() ? static_cast<Storage>(j + 1) : evalPoints[j];
             Storage y = F.evaluatePolynomial(polyCoeffs, x);
             shares[j].push_back(y);
         }
@@ -219,7 +227,14 @@ std::vector<std::vector<Storage>> getSharesHelper(
 }
 
 template<typename Storage>
-std::vector<std::vector<Storage>> getShares(const std::vector<Storage>& data, unsigned k, unsigned n, const Field<Storage>& F, unsigned kn, bool clampToOrder) {
+std::vector<std::vector<Storage>> getShares(
+    const std::vector<Storage>& data,
+    unsigned k,
+    unsigned n,
+    const Field<Storage>& F,
+    unsigned kn,
+    const std::vector<Storage>& evalPoints
+) {
     auto coeffGenerator = [](unsigned k, unsigned kn, std::mt19937_64& rng, std::uniform_int_distribution<std::uint64_t>& dist) {
         std::vector<Storage> polyCoeffs(k);
         // Fill all coefficients with random values
@@ -228,20 +243,27 @@ std::vector<std::vector<Storage>> getShares(const std::vector<Storage>& data, un
         }
         return polyCoeffs;
     };
-    
-    return getSharesHelper(data, k, n, F, kn, clampToOrder, coeffGenerator);
+
+    return getSharesHelper(data, k, n, F, kn, coeffGenerator, evalPoints);
 }
 
 template<typename Storage>
-std::vector<std::vector<Storage>> getSharesSymmetric(const std::vector<Storage>& data, unsigned k, unsigned n, const Field<Storage>& F, unsigned kn, bool clampToOrder) {
+std::vector<std::vector<Storage>> getSharesSymmetric(
+    const std::vector<Storage>& data,
+    unsigned k,
+    unsigned n,
+    const Field<Storage>& F,
+    unsigned kn,
+    const std::vector<Storage>& evalPoints
+) {
     if (n % 2 == 0) throw std::invalid_argument("n must be odd for symmetric shares");
     if (k % 2 == 0) throw std::invalid_argument("k must be odd for symmetric shares");
-    
+
     auto coeffGenerator = [](unsigned k, unsigned kn, std::mt19937_64& rng, std::uniform_int_distribution<std::uint64_t>& dist) {
         std::vector<Storage> polyCoeffs(k, static_cast<Storage>(0));
-        
+
         unsigned num_coeffs = (k + 1) / 2;
-        
+
         // Generate random coefficients for even powers only
         for (unsigned j = 0; j < num_coeffs; ++j) {
             unsigned power = 2 * j;
@@ -249,11 +271,11 @@ std::vector<std::vector<Storage>> getSharesSymmetric(const std::vector<Storage>&
                 polyCoeffs[power] = static_cast<Storage>(dist(rng));
             }
         }
-        
+
         return polyCoeffs;
     };
-    
-    return getSharesHelper(data, k, n, F, kn, clampToOrder, coeffGenerator);
+
+    return getSharesHelper(data, k, n, F, kn, coeffGenerator, evalPoints);
 }
 
 template<typename Storage>
@@ -346,13 +368,13 @@ template class BinaryField<std::uint16_t>;
 template class BinaryField<std::uint32_t>;
 
 // Secret sharing function instantiations
-template std::vector<std::vector<std::uint8_t>> getShares<std::uint8_t>(const std::vector<std::uint8_t>&, unsigned, unsigned, const Field<std::uint8_t>&, unsigned, bool);
-template std::vector<std::vector<std::uint16_t>> getShares<std::uint16_t>(const std::vector<std::uint16_t>&, unsigned, unsigned, const Field<std::uint16_t>&, unsigned, bool);
-template std::vector<std::vector<std::uint32_t>> getShares<std::uint32_t>(const std::vector<std::uint32_t>&, unsigned, unsigned, const Field<std::uint32_t>&, unsigned, bool);
+template std::vector<std::vector<std::uint8_t>> getShares<std::uint8_t>(const std::vector<std::uint8_t>&, unsigned, unsigned, const Field<std::uint8_t>&, unsigned, const std::vector<std::uint8_t>&);
+template std::vector<std::vector<std::uint16_t>> getShares<std::uint16_t>(const std::vector<std::uint16_t>&, unsigned, unsigned, const Field<std::uint16_t>&, unsigned, const std::vector<std::uint16_t>&);
+template std::vector<std::vector<std::uint32_t>> getShares<std::uint32_t>(const std::vector<std::uint32_t>&, unsigned, unsigned, const Field<std::uint32_t>&, unsigned, const std::vector<std::uint32_t>&);
 
-template std::vector<std::vector<std::uint8_t>> getSharesSymmetric<std::uint8_t>(const std::vector<std::uint8_t>&, unsigned, unsigned, const Field<std::uint8_t>&, unsigned, bool);
-template std::vector<std::vector<std::uint16_t>> getSharesSymmetric<std::uint16_t>(const std::vector<std::uint16_t>&, unsigned, unsigned, const Field<std::uint16_t>&, unsigned, bool);
-template std::vector<std::vector<std::uint32_t>> getSharesSymmetric<std::uint32_t>(const std::vector<std::uint32_t>&, unsigned, unsigned, const Field<std::uint32_t>&, unsigned, bool);
+template std::vector<std::vector<std::uint8_t>> getSharesSymmetric<std::uint8_t>(const std::vector<std::uint8_t>&, unsigned, unsigned, const Field<std::uint8_t>&, unsigned, const std::vector<std::uint8_t>&);
+template std::vector<std::vector<std::uint16_t>> getSharesSymmetric<std::uint16_t>(const std::vector<std::uint16_t>&, unsigned, unsigned, const Field<std::uint16_t>&, unsigned, const std::vector<std::uint16_t>&);
+template std::vector<std::vector<std::uint32_t>> getSharesSymmetric<std::uint32_t>(const std::vector<std::uint32_t>&, unsigned, unsigned, const Field<std::uint32_t>&, unsigned, const std::vector<std::uint32_t>&);
 
 template std::vector<std::uint8_t> reconstructFromShares<std::uint8_t>(const std::vector<std::vector<std::uint8_t>>&, const std::vector<std::uint8_t>&, unsigned, const Field<std::uint8_t>&, unsigned, std::size_t);
 template std::vector<std::uint16_t> reconstructFromShares<std::uint16_t>(const std::vector<std::vector<std::uint16_t>>&, const std::vector<std::uint16_t>&, unsigned, const Field<std::uint16_t>&, unsigned, std::size_t);

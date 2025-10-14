@@ -70,10 +70,10 @@ struct BinaryField : public Field<Storage> {
 };
 
 template<typename Storage>
-std::vector<std::vector<Storage>> getShares(const std::vector<Storage>& data, unsigned k, unsigned n, const Field<Storage>& F, unsigned kn = 1, bool clampToOrder = true);
+std::vector<std::vector<Storage>> getShares(const std::vector<Storage>& data, unsigned k, unsigned n, const Field<Storage>& F, unsigned kn = 1, const std::vector<Storage>& evalPoints = {});
 
 template<typename Storage>
-std::vector<std::vector<Storage>> getSharesSymmetric(const std::vector<Storage>& data, unsigned k, unsigned n, const Field<Storage>& F, unsigned kn = 1, bool clampToOrder = true);
+std::vector<std::vector<Storage>> getSharesSymmetric(const std::vector<Storage>& data, unsigned k, unsigned n, const Field<Storage>& F, unsigned kn = 1, const std::vector<Storage>& evalPoints = {});
 
 template<typename Storage>
 std::vector<Storage> reconstructFromShares(const std::vector<std::vector<Storage>>& shares, const std::vector<Storage>& x_values, unsigned k, const Field<Storage>& F, unsigned kn = 1, std::size_t expected_size = static_cast<std::size_t>(-1));
