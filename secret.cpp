@@ -350,6 +350,10 @@ template std::vector<std::vector<std::uint8_t>> getShares<std::uint8_t>(const st
 template std::vector<std::vector<std::uint16_t>> getShares<std::uint16_t>(const std::vector<std::uint16_t>&, unsigned, unsigned, const Field<std::uint16_t>&, unsigned, bool);
 template std::vector<std::vector<std::uint32_t>> getShares<std::uint32_t>(const std::vector<std::uint32_t>&, unsigned, unsigned, const Field<std::uint32_t>&, unsigned, bool);
 
+template std::vector<std::vector<std::uint8_t>> getSharesSymmetric<std::uint8_t>(const std::vector<std::uint8_t>&, unsigned, unsigned, const Field<std::uint8_t>&, unsigned, bool);
+template std::vector<std::vector<std::uint16_t>> getSharesSymmetric<std::uint16_t>(const std::vector<std::uint16_t>&, unsigned, unsigned, const Field<std::uint16_t>&, unsigned, bool);
+template std::vector<std::vector<std::uint32_t>> getSharesSymmetric<std::uint32_t>(const std::vector<std::uint32_t>&, unsigned, unsigned, const Field<std::uint32_t>&, unsigned, bool);
+
 template std::vector<std::uint8_t> reconstructFromShares<std::uint8_t>(const std::vector<std::vector<std::uint8_t>>&, const std::vector<std::uint8_t>&, unsigned, const Field<std::uint8_t>&, unsigned, std::size_t);
 template std::vector<std::uint16_t> reconstructFromShares<std::uint16_t>(const std::vector<std::vector<std::uint16_t>>&, const std::vector<std::uint16_t>&, unsigned, const Field<std::uint16_t>&, unsigned, std::size_t);
 template std::vector<std::uint32_t> reconstructFromShares<std::uint32_t>(const std::vector<std::vector<std::uint32_t>>&, const std::vector<std::uint32_t>&, unsigned, const Field<std::uint32_t>&, unsigned, std::size_t);
