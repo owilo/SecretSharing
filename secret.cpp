@@ -142,8 +142,16 @@ typename BinaryField<Storage>::storage_type BinaryField<Storage>::inv(storage_ty
 
 // Secret sharing
 
-template<typename Storage>
-std::vector<std::vector<Storage>> getShares(const std::vector<Storage>& data, unsigned k, unsigned n, const Field<Storage>& F, unsigned kn, bool clampToOrder) {
+template<typename Storage, typename CoeffGenerator>
+std::vector<std::vector<Storage>> getSharesHelper(
+    const std::vector<Storage>& data, 
+    unsigned k, 
+    unsigned n, 
+    const Field<Storage>& F, 
+    unsigned kn, 
+    bool clampToOrder,
+    CoeffGenerator coeffGenerator
+) {
     if (k == 0 || n == 0) throw std::invalid_argument("k and n must be > 0");
     if (kn == 0 || kn > k) throw std::invalid_argument("kn must satisfy 1 <= kn <= k");
     
@@ -176,9 +184,10 @@ std::vector<std::vector<Storage>> getShares(const std::vector<Storage>& data, un
 
     unsigned dataCursor = 0;
     for (unsigned block = 0; block < shareSize; ++block) {
-        std::vector<Storage> polyCoeffs(k);
+        // Get polynomial coefficients from the provided generator
+        std::vector<Storage> polyCoeffs = coeffGenerator(k, kn, rng, dist);
         
-        // Pack secret data
+        // Pack secret data into the first kn coefficients
         for (unsigned j = 0; j < kn; ++j) {
             if (dataCursor < data.size()) {
                 Storage value = data[dataCursor++];
@@ -198,11 +207,6 @@ std::vector<std::vector<Storage>> getShares(const std::vector<Storage>& data, un
                 polyCoeffs[j] = static_cast<Storage>(0);
             }
         }
-        
-        // Fill remaining coefficients with random values
-        for (unsigned j = kn; j < k; ++j) {
-            polyCoeffs[j] = static_cast<Storage>(dist(rng));
-        }
 
         // Evaluate polynomial
         for (unsigned j = 0; j < n; ++j) {
@@ -212,6 +216,44 @@ std::vector<std::vector<Storage>> getShares(const std::vector<Storage>& data, un
         }
     }
     return shares;
+}
+
+template<typename Storage>
+std::vector<std::vector<Storage>> getShares(const std::vector<Storage>& data, unsigned k, unsigned n, const Field<Storage>& F, unsigned kn, bool clampToOrder) {
+    auto coeffGenerator = [](unsigned k, unsigned kn, std::mt19937_64& rng, std::uniform_int_distribution<std::uint64_t>& dist) {
+        std::vector<Storage> polyCoeffs(k);
+        // Fill all coefficients with random values
+        for (unsigned j = 0; j < k; ++j) {
+            polyCoeffs[j] = static_cast<Storage>(dist(rng));
+        }
+        return polyCoeffs;
+    };
+    
+    return getSharesHelper(data, k, n, F, kn, clampToOrder, coeffGenerator);
+}
+
+template<typename Storage>
+std::vector<std::vector<Storage>> getSharesSymmetric(const std::vector<Storage>& data, unsigned k, unsigned n, const Field<Storage>& F, unsigned kn, bool clampToOrder) {
+    if (n % 2 == 0) throw std::invalid_argument("n must be odd for symmetric shares");
+    if (k % 2 == 0) throw std::invalid_argument("k must be odd for symmetric shares");
+    
+    auto coeffGenerator = [](unsigned k, unsigned kn, std::mt19937_64& rng, std::uniform_int_distribution<std::uint64_t>& dist) {
+        std::vector<Storage> polyCoeffs(k, static_cast<Storage>(0));
+        
+        unsigned num_coeffs = (k + 1) / 2;
+        
+        // Generate random coefficients for even powers only
+        for (unsigned j = 0; j < num_coeffs; ++j) {
+            unsigned power = 2 * j;
+            if (power < k) {
+                polyCoeffs[power] = static_cast<Storage>(dist(rng));
+            }
+        }
+        
+        return polyCoeffs;
+    };
+    
+    return getSharesHelper(data, k, n, F, kn, clampToOrder, coeffGenerator);
 }
 
 template<typename Storage>

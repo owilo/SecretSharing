@@ -70,7 +70,7 @@ void runScheme(const std::string &label,
                const std::string &result_prefix,
                bool do_failed_experiment = false,
                bool divide_share_height_by_k = false,
-               bool clampToField = false)
+               bool clampToField = true)
 {
     std::cout << "\n--- " << label << " (n=" << n << ", k=" << k << ", kn=" << kn << ") ---\n";
 
