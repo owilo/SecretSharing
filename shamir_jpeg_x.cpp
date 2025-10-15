@@ -24,7 +24,7 @@ int main() {
     const unsigned k = 3;
     const unsigned kn = 1;
 
-    const std::string out_base = "results/shamir256test_x";
+    const std::string out_base = "results/shamir256jpeg_x";
     fs::create_directories(out_base);
     fs::create_directories(out_base + "/shadows");
     fs::create_directories(out_base + "/shadows_jpeg");
