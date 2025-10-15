@@ -6,3 +6,6 @@ shamir_jpeg: secret.cpp image.cpp shamir_jpeg.cpp
 
 shamir_jpeg_symmetric: secret.cpp image.cpp shamir_jpeg_symmetric.cpp
 	g++ secret.cpp image.cpp shamir_jpeg_symmetric.cpp -o shamir_jpeg_symmetric -O3 -Iinclude
+
+shamir_jpeg_x: secret.cpp image.cpp shamir_jpeg_x.cpp
+	g++ secret.cpp image.cpp shamir_jpeg_x.cpp -o shamir_jpeg_x -O3 -Iinclude
