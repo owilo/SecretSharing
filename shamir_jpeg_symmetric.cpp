@@ -14,59 +14,6 @@
 namespace fs = std::filesystem;
 
 
-bool generateAndSaveDiffMap(const std::vector<std::uint8_t> &orig, const std::vector<std::uint8_t> &mod, int width, int height, const std::string &out_path) {
-    size_t px_expected = static_cast<size_t>(width) * static_cast<size_t>(height);
-    size_t pxcount = std::min(orig.size(), mod.size());
-
-    if (pxcount == 0) {
-        std::cerr << "Warning: zero pixels provided for diff map '" << out_path << "'\n";
-        return false;
-    }
-    if (pxcount != px_expected) {
-        std::cerr << "Warning: diff map pixel count (" << pxcount << ") != width*height (" << px_expected << ") for '" << out_path << "'. Using min size.\n";
-    }
-
-    int minDiff = std::numeric_limits<int>::max();
-    int maxDiff = std::numeric_limits<int>::min();
-    std::vector<int> diffs(pxcount);
-
-    for (size_t p = 0; p < pxcount; ++p) {
-        int d = static_cast<int>(mod[p]) - static_cast<int>(orig[p]);
-        diffs[p] = d;
-        if (d < minDiff) minDiff = d;
-        if (d > maxDiff) maxDiff = d;
-    }
-
-    double s_neg = std::numeric_limits<double>::infinity();
-    double s_pos = std::numeric_limits<double>::infinity();
-
-    if (minDiff < 0) {
-        s_neg = 127.0 / static_cast<double>(-minDiff);
-    }
-    if (maxDiff > 0) {
-        s_pos = 128.0 / static_cast<double>(maxDiff);
-    }
-
-    double s;
-    if (!std::isfinite(s_neg) && !std::isfinite(s_pos)) {
-        s = 0.0;
-    } else {
-        s = std::min(s_neg, s_pos);
-    }
-
-    std::vector<std::uint8_t> diff_map(px_expected, 127);
-    for (size_t p = 0; p < pxcount; ++p) {
-        double mapped = 127.0 + s * static_cast<double>(diffs[p]);
-        int im = static_cast<int>(std::lround(mapped));
-        if (im < 0) im = 0;
-        if (im > 255) im = 255;
-        diff_map[p] = static_cast<std::uint8_t>(im);
-    }
-
-    ss::saveGrayscalePNG(out_path, diff_map, width, height);
-    return true;
-}
-
 static void genCombinations(unsigned center, unsigned r, unsigned start, std::vector<unsigned> &current, std::vector<std::vector<unsigned>> &out) {
     if (current.size() == r) {
         out.push_back(current);
@@ -163,7 +110,9 @@ int main() {
                     std::cout << "k=" << k << " | Share " << (j+1) << " orig vs JPEG | PSNR = " << ss::computePSNR(shares[j], comp_shares[j]) << " dB | NPCR = " << ss::computeNPCR(shares[j], comp_shares[j]) << "% | UACI = " << ss::computeUACI(shares[j], comp_shares[j]) << "%\n";
 
                     std::string diff_path = kdir + "/diff_maps/diff_share_" + std::to_string(j+1) + ".png";
-                    generateAndSaveDiffMap(shares[j], comp_shares[j], width, height, diff_path);
+                    
+                    std::vector<std::uint8_t> diff_map = ss::generateDiffMap(shares[j], comp_shares[j], width, height);
+                    ss::saveGrayscalePNG(diff_path, diff_map, width, height);
                 }
             }
         }
@@ -207,7 +156,9 @@ int main() {
             std::cout << "k=" << k << " | Reconstruction using shares (" << idx_str << ") | PSNR: " << ss::computePSNR(field_vec, rec) << " dB | NPCR: " << ss::computeNPCR(field_vec, rec) << "% | UACI: " << ss::computeUACI(field_vec, rec) << "%\n";
 
             std::string rec_diff = kdir + "/diff_maps/diff_reconstruction_" + idx_str + ".png";
-            generateAndSaveDiffMap(field_vec, rec, width, height, rec_diff);
+
+            std::vector<std::uint8_t> diff_map = ss::generateDiffMap(field_vec, rec, width, height);
+            ss::saveGrayscalePNG(rec_diff, diff_map, width, height);
         }
     }
 

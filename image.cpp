@@ -40,6 +40,61 @@ std::tuple<std::vector<std::uint8_t>, int, int> readGrayscalePNG(const std::file
     return {std::move(pixels), w, h};
 }
 
+std::vector<std::uint8_t> generateDiffMap(const std::vector<std::uint8_t>& orig, const std::vector<std::uint8_t>& recon, int width, int height) {
+    if (width <= 0 || height <= 0) {
+        throw std::invalid_argument("generateDiffMap: width and height must be positive");
+    }
+
+    const std::size_t px_expected = static_cast<std::size_t>(width) * static_cast<std::size_t>(height);
+
+    if (orig.size() != px_expected || recon.size() != px_expected) {
+        throw std::invalid_argument("generateDiffMap: input buffers must have exactly width*height elements");
+    }
+
+    int minDiff = std::numeric_limits<int>::max();
+    int maxDiff = std::numeric_limits<int>::min();
+
+    std::vector<int> diffs;
+    diffs.reserve(px_expected);
+
+    for (std::size_t i = 0; i < px_expected; ++i) {
+        int d = static_cast<int>(recon[i]) - static_cast<int>(orig[i]);
+        diffs.push_back(d);
+        if (d < minDiff) minDiff = d;
+        if (d > maxDiff) maxDiff = d;
+    }
+
+    // Determine scaling
+    double s_neg = std::numeric_limits<double>::infinity();
+    double s_pos = std::numeric_limits<double>::infinity();
+
+    if (minDiff < 0) {
+        s_neg = 127.0 / static_cast<double>(-minDiff);
+    }
+    if (maxDiff > 0) {
+        s_pos = 128.0 / static_cast<double>(maxDiff);
+    }
+
+    double s;
+    if (!std::isfinite(s_neg) && !std::isfinite(s_pos)) {
+        s = 0.0;
+    } else {
+        s = std::min(s_neg, s_pos);
+    }
+
+    std::vector<std::uint8_t> diff_map(px_expected, 127u);
+
+    for (std::size_t i = 0; i < px_expected; ++i) {
+        double mapped = 127.0 + s * static_cast<double>(diffs[i]);
+        int im = static_cast<int>(std::lround(mapped));
+        if (im < 0) im = 0;
+        else if (im > 255) im = 255;
+        diff_map[i] = static_cast<std::uint8_t>(im);
+    }
+
+    return diff_map;
+}
+
 std::vector<std::uint8_t> stretchHistogram(
     const std::vector<std::uint8_t>& image,
     std::uint8_t in_min,
