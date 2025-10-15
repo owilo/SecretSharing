@@ -1,13 +1,30 @@
 #pragma once
 
-#include <array>
-#include <string>
 #include <vector>
 #include <cstdint>
+#include <algorithm>
+#include <cmath>
+#include <fstream>
+#include <filesystem>
+#include <string>
+#include <string_view>
+#include <array>
+#include <tuple>
 #include <stdexcept>
+#include <sstream>
+#include <span>
+
+extern "C" {
+    #include "stb_image.h"
+    #include "stb_image_write.h"
+}
 
 namespace ss {
 
+std::pair<int, int> saveGrayscalePNG(const std::filesystem::path& path, std::span<const std::uint8_t> pixels, int w, int h);
+
+std::tuple<std::vector<std::uint8_t>, int, int> readGrayscalePNG(const std::filesystem::path& path);
+    
 std::vector<std::uint8_t> stretchHistogram(const std::vector<std::uint8_t>& image, std::uint8_t in_min, std::uint8_t in_max, std::uint8_t out_min, std::uint8_t out_max) noexcept;
 
 std::array<unsigned, 256> computeHistogram(const std::vector<std::uint8_t>& image);

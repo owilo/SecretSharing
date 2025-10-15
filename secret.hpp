@@ -5,6 +5,14 @@
 #include <cstddef>
 #include <stdexcept>
 #include <type_traits>
+#include <utility>
+#include <cmath>
+#include <iostream>
+#include <limits>
+#include <random>
+#include <unordered_set>
+#include <algorithm>
+#include <numeric>
 
 namespace ss {
 
@@ -76,6 +84,9 @@ template<typename Storage>
 std::vector<std::vector<Storage>> getSharesSymmetric(const std::vector<Storage>& data, unsigned k, unsigned n, const Field<Storage>& F, unsigned kn = 1, const std::vector<Storage>& evalPoints = {});
 
 template<typename Storage>
-std::vector<Storage> reconstructFromShares(const std::vector<std::vector<Storage>>& shares, const std::vector<Storage>& x_values, unsigned k, const Field<Storage>& F, unsigned kn = 1, std::size_t expected_size = static_cast<std::size_t>(-1));
+std::vector<Storage> reconstructFromShares(const std::vector<std::vector<Storage>>& shares, const std::vector<Storage>& evalPoints, unsigned k, const Field<Storage>& F, unsigned kn = 1, std::size_t expected_size = static_cast<std::size_t>(-1));
+
+template<typename Storage>
+std::pair<std::vector<std::vector<Storage>>, std::vector<Storage>> selectSharesAndEvalPoints(const std::vector<unsigned>& indices, const std::vector<std::vector<Storage>>& shares, const std::vector<Storage>& evalPoints = {});
 
 } // namespace ss

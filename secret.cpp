@@ -1,17 +1,5 @@
 #include "secret.hpp"
 
-#include <cstddef>
-#include <cstdint>
-#include <cmath>
-#include <iostream>
-#include <limits>
-#include <random>
-#include <stdexcept>
-#include <type_traits>
-#include <unordered_set>
-#include <vector>
-#include <algorithm>
-
 namespace ss {
 
 static constexpr std::uint64_t irr[32] = {
@@ -279,10 +267,19 @@ std::vector<std::vector<Storage>> getSharesSymmetric(
 }
 
 template<typename Storage>
-std::vector<Storage> reconstructFromShares(const std::vector<std::vector<Storage>>& shares, const std::vector<Storage>& x_values, unsigned k, const Field<Storage>& F, unsigned kn, std::size_t expected_size) {
+std::vector<Storage> reconstructFromShares(
+    const std::vector<std::vector<Storage>>& shares,
+    const std::vector<Storage>& evalPoints,
+    unsigned k,
+    const Field<Storage>& F, 
+    unsigned kn,
+    std::size_t expected_size
+) {
     if (shares.size() < k) throw std::invalid_argument("Not enough shares");
-    if (x_values.size() < k) throw std::invalid_argument("Not enough x_values");
-    
+    if (k == 0) throw std::invalid_argument("k must be > 0");
+
+    if (evalPoints.size() < k) throw std::invalid_argument("Not enough evalPoints");
+
     const unsigned shareSize = static_cast<unsigned>(shares[0].size());
     for (unsigned i = 0; i < k; ++i) {
         if (shares[i].size() != shareSize) {
@@ -293,9 +290,10 @@ std::vector<Storage> reconstructFromShares(const std::vector<std::vector<Storage
     std::vector<Storage> result;
     result.reserve(static_cast<size_t>(shareSize) * kn);
 
+    // Use first k evaluation points
     std::vector<Storage> xs(k);
     for (unsigned i = 0; i < k; ++i) {
-        xs[i] = x_values[i];
+        xs[i] = evalPoints[i];
     }
 
     for (unsigned block = 0; block < shareSize; ++block) {
@@ -304,10 +302,10 @@ std::vector<Storage> reconstructFromShares(const std::vector<std::vector<Storage
         for (unsigned m_idx = 0; m_idx < k; ++m_idx) {
             Storage x_m = xs[m_idx];
             Storage y_m = shares[m_idx][block];
-            
+
             std::vector<Storage> poly(1, static_cast<Storage>(1));
             Storage denom = static_cast<Storage>(1);
-            
+
             // Build Lagrange basis polynomial and denominator
             for (unsigned l = 0; l < k; ++l) {
                 if (l == m_idx) continue;
@@ -315,12 +313,12 @@ std::vector<Storage> reconstructFromShares(const std::vector<std::vector<Storage
                 Storage diff = F.sub(x_m, xs[l]);
                 denom = F.mul(denom, diff);
             }
-            
+
             if (denom == 0) throw std::runtime_error("Singular denominator in Lagrange basis (duplicate x?)");
-            
+
             Storage invDenom = F.inv(denom);
             Storage scale = F.mul(y_m, invDenom);
-            
+
             // Accumulate the scaled basis polynomial
             for (size_t j = 0; j < poly.size(); ++j) {
                 Storage addv = F.mul(scale, poly[j]);
@@ -348,6 +346,41 @@ std::vector<Storage> reconstructFromShares(const std::vector<std::vector<Storage
     }
 
     return result;
+}
+
+template<typename Storage>
+std::pair<std::vector<std::vector<Storage>>, std::vector<Storage>> selectSharesAndEvalPoints(
+    const std::vector<unsigned>& indices,
+    const std::vector<std::vector<Storage>>& shares,
+    const std::vector<Storage>& evalPoints
+) {
+    if (indices.size() > shares.size()) {
+        throw std::invalid_argument("Too many indices");
+    }
+
+    std::vector<Storage> actual_evalPoints;
+    if (evalPoints.empty()) {
+        actual_evalPoints.resize(shares.size());
+        std::iota(actual_evalPoints.begin(), actual_evalPoints.end(), static_cast<Storage>(1));
+    } else {
+        actual_evalPoints = evalPoints;
+    }
+
+    std::vector<std::vector<Storage>> selected_shares;
+    std::vector<Storage> selected_evalPoints;
+    selected_shares.reserve(indices.size());
+    selected_evalPoints.reserve(indices.size());
+    for (unsigned idx : indices) {
+        if (idx >= shares.size()) {
+            throw std::out_of_range("Index out of range in selectSharesAndEvalPoints");
+        }
+        selected_shares.push_back(shares[idx]);
+        if (idx >= actual_evalPoints.size()) {
+            throw std::out_of_range("Index out of range in evalPoints in selectSharesAndEvalPoints");
+        }
+        selected_evalPoints.push_back(actual_evalPoints[idx]);
+    }
+    return {selected_shares, selected_evalPoints};
 }
 
 // Template instantiations
@@ -379,5 +412,9 @@ template std::vector<std::vector<std::uint32_t>> getSharesSymmetric<std::uint32_
 template std::vector<std::uint8_t> reconstructFromShares<std::uint8_t>(const std::vector<std::vector<std::uint8_t>>&, const std::vector<std::uint8_t>&, unsigned, const Field<std::uint8_t>&, unsigned, std::size_t);
 template std::vector<std::uint16_t> reconstructFromShares<std::uint16_t>(const std::vector<std::vector<std::uint16_t>>&, const std::vector<std::uint16_t>&, unsigned, const Field<std::uint16_t>&, unsigned, std::size_t);
 template std::vector<std::uint32_t> reconstructFromShares<std::uint32_t>(const std::vector<std::vector<std::uint32_t>>&, const std::vector<std::uint32_t>&, unsigned, const Field<std::uint32_t>&, unsigned, std::size_t);
+
+template std::pair<std::vector<std::vector<std::uint8_t>>, std::vector<std::uint8_t>> selectSharesAndEvalPoints(const std::vector<unsigned>& indices, const std::vector<std::vector<std::uint8_t>>& shares, const std::vector<std::uint8_t>& evalPoints);
+template std::pair<std::vector<std::vector<std::uint16_t>>, std::vector<std::uint16_t>> selectSharesAndEvalPoints(const std::vector<unsigned>& indices, const std::vector<std::vector<std::uint16_t>>& shares, const std::vector<std::uint16_t>& evalPoints);
+template std::pair<std::vector<std::vector<std::uint32_t>>, std::vector<std::uint32_t>> selectSharesAndEvalPoints(const std::vector<unsigned>& indices, const std::vector<std::vector<std::uint32_t>>& shares, const std::vector<std::uint32_t>& evalPoints);
 
 } // namespace ss

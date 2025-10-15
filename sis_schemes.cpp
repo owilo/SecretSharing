@@ -1,61 +1,15 @@
 #include <iostream>
 #include <vector>
 #include <string>
-#include <filesystem>
 #include <algorithm>
 #include <cstdint>
 #include <numeric>
-
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
+#include <filesystem>
 
 #include "secret.hpp"
 #include "image.hpp"
 
 namespace fs = std::filesystem;
-
-bool saveGrayPNG(const std::string &path, const std::vector<std::uint8_t> &pixels, int w, int h) {
-    if ((static_cast<std::size_t>(w) * h) != pixels.size()) {
-        std::cerr << "Warning: pixel buffer size (" << pixels.size() << ") != w*h (" << (w*h) << ").\n";
-        std::vector<std::uint8_t> tmp((size_t)w * (size_t)h, 0);
-        size_t copy = std::min(tmp.size(), pixels.size());
-        std::copy(pixels.begin(), pixels.begin() + copy, tmp.begin());
-        return stbi_write_png(path.c_str(), w, h, 1, tmp.data(), w) != 0;
-    }
-    return stbi_write_png(path.c_str(), w, h, 1, pixels.data(), w) != 0;
-}
-
-bool readGrayPNG(const std::string &path, std::vector<std::uint8_t> &out_pixels, int &out_w, int &out_h) {
-    int w,h,channels;
-    unsigned char *data = stbi_load(path.c_str(), &w, &h, &channels, 1);
-    if (!data) {
-        std::cerr << "Failed to load image '" << path << "': " << stbi_failure_reason() << "\n";
-        return false;
-    }
-    out_w = w; out_h = h;
-    out_pixels.assign(data, data + (w * h));
-    stbi_image_free(data);
-    return true;
-}
-
-void selectSharesAndXs(const std::vector<std::vector<std::uint8_t>> &all_shares,
-                       const std::vector<unsigned> &indices0based,
-                       std::vector<std::vector<std::uint8_t>> &sel_shares,
-                       std::vector<std::uint8_t> &xs)
-{
-    sel_shares.clear();
-    xs.clear();
-    for (unsigned idx : indices0based) {
-        if (idx >= all_shares.size()) {
-            std::cerr << "Index out of range when selecting shares: " << idx << "\n";
-            continue;
-        }
-        sel_shares.push_back(all_shares[idx]);
-        xs.push_back(static_cast<std::uint8_t>(idx + 1));
-    }
-}
 
 template <typename FieldType>
 void runScheme(const std::string &label,
@@ -91,7 +45,7 @@ void runScheme(const std::string &label,
     int share_h = divide_share_height_by_k ? (height / k) : height;
     for (size_t i = 0; i < shares.size(); ++i) {
         std::string outp = result_prefix + "/shadows/shadow_" + std::to_string(i+1) + ".png";
-        saveGrayPNG(outp, shares[i], width, share_h);
+        ss::saveGrayscalePNG(outp, shares[i], width, share_h);
     }
 
     std::vector<unsigned> idxA(k);
@@ -105,12 +59,10 @@ void runScheme(const std::string &label,
         }
     }
 
-    auto reconstructAndSave = [&](const std::vector<unsigned> &indices, const std::string &out_path, unsigned rec_k){
-        std::vector<std::vector<std::uint8_t>> sel;
-        std::vector<std::uint8_t> xs;
-        selectSharesAndXs(shares, indices, sel, xs);
-        auto rec = ss::reconstructFromShares<std::uint8_t>(sel, xs, rec_k, field, kn, static_cast<unsigned>(secret_size));
-        saveGrayPNG(out_path, rec, width, height);
+    auto reconstructAndSave = [&](const std::vector<unsigned>& indices, const std::string& out_path, unsigned rec_k){
+        auto [selectedShares, selectedXs] = ss::selectSharesAndEvalPoints(indices, shares);
+        auto rec = ss::reconstructFromShares<std::uint8_t>(selectedShares, selectedXs, rec_k, field, kn, static_cast<unsigned>(secret_size));
+        ss::saveGrayscalePNG(out_path, rec, width, height);
         return rec;
     };
 
@@ -147,13 +99,7 @@ void runScheme(const std::string &label,
 
 int main() {
     const std::string input_path = "images/input.png";
-
-    std::vector<std::uint8_t> secret_pixels;
-    int width=0, height=0;
-    if (!readGrayPNG(input_path, secret_pixels, width, height)) {
-        std::cerr << "Failed to read the input secret image. Exiting.\n";
-        return 1;
-    }
+    auto [secret_pixels, width, height] = ss::readGrayscalePNG(input_path);
     size_t secret_size = secret_pixels.size();
     std::cout << "Loaded secret image '" << input_path << "' (" << width << "x" << height << "), bytes: " << secret_size << "\n";
 

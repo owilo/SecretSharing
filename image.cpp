@@ -1,12 +1,44 @@
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+
 #include "image.hpp"
 
-#include <vector>
-#include <cstdint>
-#include <algorithm>
-#include <cmath>
-#include <fstream>
-
 namespace ss {
+
+std::pair<int, int> saveGrayscalePNG(const std::filesystem::path& path, std::span<const std::uint8_t> pixels, int w, int h) {
+    if (w <= 0 || h <= 0) {
+        throw std::invalid_argument("saveGrayPNG: width and height must be positive");
+    }
+
+    const std::size_t expected = static_cast<std::size_t>(w) * static_cast<std::size_t>(h);
+    if (pixels.size() != expected) {
+        std::ostringstream oss;
+        oss << "saveGrayPNG: pixel buffer size (" << pixels.size() << ") != w * h (" << expected << ")";
+        throw std::invalid_argument(oss.str());
+    }
+
+    if (stbi_write_png(path.string().c_str(), w, h, 1, pixels.data(), w) == 0) {
+        throw std::runtime_error("saveGrayPNG: stbi_write_png failed for " + path.string());
+    }
+
+    return {w, h};
+}
+
+std::tuple<std::vector<std::uint8_t>, int, int> readGrayscalePNG(const std::filesystem::path& path) {
+    int w = 0, h = 0, channels = 0;
+    unsigned char *data = stbi_load(path.string().c_str(), &w, &h, &channels, 1);
+    if (!data) {
+        std::string reason = stbi_failure_reason() ? stbi_failure_reason() : "unknown";
+        throw std::runtime_error("readGrayPNG: failed to load '" + path.string() + "': " + reason);
+    }
+
+    const std::size_t expected = static_cast<std::size_t>(w) * static_cast<std::size_t>(h);
+    std::vector<std::uint8_t> pixels;
+    pixels.assign(data, data + expected);
+
+    stbi_image_free(data);
+    return {std::move(pixels), w, h};
+}
 
 std::vector<std::uint8_t> stretchHistogram(
     const std::vector<std::uint8_t>& image,
