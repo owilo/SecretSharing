@@ -89,33 +89,19 @@ int main() {
 
         std::vector<std::vector<std::uint8_t>> comp_shares = shares;
 
-        {
-            unsigned j = center;
-            std::string jpeg_path = kdir + "/shadows_jpeg/shadow_" + std::to_string(j+1) + ".jpg";
+        unsigned j = center;
+        std::string jpeg_path = kdir + "/shadows_jpeg/shadow_" + std::to_string(j+1) + ".jpg";
+        comp_shares[j] = ss::jpegify(shares[j], width, height, jpeg_quality, kdir);
 
-            if (!stbi_write_jpg(jpeg_path.c_str(), width, height, 1, shares[j].data(), jpeg_quality)) {
-                std::cerr << "Warning: failed to write JPEG for share " << (j+1) << " to '" << jpeg_path << "'\n";
-            } else {
-                int w2=0, h2=0, channels=0;
-                unsigned char *data = stbi_load(jpeg_path.c_str(), &w2, &h2, &channels, 1);
-                if (!data) {
-                    std::cerr << "Warning: failed to reload JPEG '" << jpeg_path << "': " << stbi_failure_reason() << "\n";
-                } else {
-                    if (w2 != width || h2 != height) {
-                        std::cerr << "Warning: reloaded JPEG size mismatch for '" << jpeg_path << "' (" << w2 << "x" << h2 << ") expected (" << width << "x" << height << ")\n";
-                    }
-                    comp_shares[j].assign(data, data + (static_cast<size_t>(w2) * static_cast<size_t>(h2)));
-                    stbi_image_free(data);
+        std::cout << "Share " << (j+1)
+            << " orig vs JPEG | PSNR = " << ss::computePSNR(shares[j], comp_shares[j])
+            << " dB | NPCR = " << ss::computeNPCR(shares[j], comp_shares[j])
+            << "% | UACI = " << ss::computeUACI(shares[j], comp_shares[j])
+            << "%\n";
 
-                    std::cout << "k=" << k << " | Share " << (j+1) << " orig vs JPEG | PSNR = " << ss::computePSNR(shares[j], comp_shares[j]) << " dB | NPCR = " << ss::computeNPCR(shares[j], comp_shares[j]) << "% | UACI = " << ss::computeUACI(shares[j], comp_shares[j]) << "%\n";
-
-                    std::string diff_path = kdir + "/diff_maps/diff_share_" + std::to_string(j+1) + ".png";
-                    
-                    std::vector<std::uint8_t> diff_map = ss::generateDiffMap(shares[j], comp_shares[j], width, height);
-                    ss::saveGrayscalePNG(diff_path, diff_map, width, height);
-                }
-            }
-        }
+        auto diff_map = ss::generateDiffMap(shares[j], comp_shares[j], width, height);
+        std::string diff_path = out_base + "/diff_maps/diff_share_" + std::to_string(j+1) + ".png";
+        ss::saveGrayscalePNG(diff_path, diff_map, width, height);
 
         unsigned r = (k - 1) / 2;
         std::vector<std::vector<unsigned>> combos;

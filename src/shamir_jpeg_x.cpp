@@ -77,23 +77,7 @@ int main() {
                                    "_noised_share" + std::to_string(share_to_noise+1) +
                                    "_x" + std::to_string(static_cast<int>(x_values[share_to_noise])) + ".jpg";
 
-            if (!stbi_write_jpg(jpeg_path.c_str(), width, height, 1, shares[share_to_noise].data(), jpeg_quality)) {
-                std::cerr << "Warning: failed to write JPEG for share " << (share_to_noise+1) << " to '" << jpeg_path << "'\n";
-                continue;
-            }
-
-            int w2=0, h2=0, channels=0;
-            unsigned char *data = stbi_load(jpeg_path.c_str(), &w2, &h2, &channels, 1);
-            if (!data) {
-                std::cerr << "Warning: failed to reload JPEG '" << jpeg_path << "': " << stbi_failure_reason() << "\n";
-                continue;
-            }
-
-            if (w2 != width || h2 != height) {
-                std::cerr << "Warning: reloaded JPEG size mismatch for '" << jpeg_path << "' (" << w2 << "x" << h2 << ") expected (" << width << "x" << height << ")\n";
-            }
-            comp_shares[share_to_noise].assign(data, data + (static_cast<size_t>(w2) * static_cast<size_t>(h2)));
-            stbi_image_free(data);
+            comp_shares[share_to_noise] = ss::jpegify(shares[share_to_noise], width, height, jpeg_quality, jpeg_path);
 
             std::cout << "Share " << (share_to_noise+1) << " (x=" << static_cast<int>(x_values[share_to_noise])
                       << ") orig vs JPEG | PSNR = " << ss::computePSNR(shares[share_to_noise], comp_shares[share_to_noise])
@@ -107,7 +91,6 @@ int main() {
             std::vector<std::uint8_t> diff_map = ss::generateDiffMap(shares[share_to_noise], comp_shares[share_to_noise], width, height);
             ss::saveGrayscalePNG(diff_path, diff_map, width, height);
 
-            // Choose k shares, prefer non-noised ones
             std::vector<unsigned> indices;
             indices.reserve(k);
             for (unsigned i = 0; i < comp_shares.size() && indices.size() < k; ++i) {
@@ -152,7 +135,7 @@ int main() {
 
     ss::saveHistogram(out_base + "/histogram.dat", ss::computeHistogram(secret_pixels));
 
-    std::cout << "\n=== All tests completed. Total: " << x_sets.size() << " sets × 3 shares = "
+    std::cout << "\n=== All tests completed. Total: " << x_sets.size() << " sets x 3 shares = "
               << (x_sets.size() * 3) << " test cases ===\n";
 
     return 0;

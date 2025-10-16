@@ -26,7 +26,7 @@ std::pair<int, int> saveGrayscalePNG(const std::filesystem::path& path, std::spa
 
 std::tuple<std::vector<std::uint8_t>, int, int> readGrayscalePNG(const std::filesystem::path& path) {
     int w = 0, h = 0, channels = 0;
-    unsigned char *data = stbi_load(path.string().c_str(), &w, &h, &channels, 1);
+    std::uint8_t *data = stbi_load(path.string().c_str(), &w, &h, &channels, 1);
     if (!data) {
         std::string reason = stbi_failure_reason() ? stbi_failure_reason() : "unknown";
         throw std::runtime_error("readGrayPNG: failed to load '" + path.string() + "': " + reason);
@@ -156,6 +156,93 @@ bool saveHistogram(std::string path, const std::array<unsigned, 256>& histogram)
         ofs << i << " " << histogram[i] << "\n";
     }
     return true;
+}
+
+std::vector<std::uint8_t> medianFilter(const std::vector<std::uint8_t>& image, int width, int height, int filter_size) {
+    if (width <= 0 || height <= 0) {
+        throw std::invalid_argument("Width and height must be positive");
+    }
+    if (filter_size <= 0 || filter_size % 2 == 0) {
+        throw std::invalid_argument("Filter_size must be a positive odd integer");
+    }
+
+    const std::size_t px_expected = static_cast<std::size_t>(width) * static_cast<std::size_t>(height);
+    if (image.size() != px_expected) {
+        throw std::invalid_argument("Input buffer must have exactly width*height elements");
+    }
+
+    const int radius = filter_size / 2;
+    std::vector<std::uint8_t> filtered(image.size(), 0);
+
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            std::vector<std::uint8_t> neighborhood;
+            for (int dy = -radius; dy <= radius; ++dy) {
+                for (int dx = -radius; dx <= radius; ++dx) {
+                    int nx = x + dx;
+                    int ny = y + dy;
+                    if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                        neighborhood.push_back(image[ny * width + nx]);
+                    }
+                }
+            }
+            std::nth_element(neighborhood.begin(), neighborhood.begin() + neighborhood.size() / 2, neighborhood.end());
+            filtered[y * width + x] = neighborhood[neighborhood.size() / 2];
+        }
+    }
+
+    return filtered;
+}
+
+// TODO : use in-memory operations if possible
+std::vector<std::uint8_t> jpegify(const std::vector<std::uint8_t>& image, int width, int height, int quality, std::string output_file) {
+    if (image.empty()) {
+        throw std::invalid_argument("jInput image is empty");
+    }
+    if (width <= 0 || height <= 0) {
+        throw std::invalid_argument("Width and height must be positive");
+    }
+    if (quality < 1 || quality > 100) {
+        throw std::invalid_argument("Quality must be in [1,100]");
+    }
+    const std::size_t expected = static_cast<std::size_t>(width) * static_cast<std::size_t>(height);
+    if (image.size() != expected) {
+        throw std::invalid_argument("Input image size does not match width*height");
+    }
+
+    const bool use_temp = output_file.empty();
+    std::string path = use_temp ? "tmp/tmp.jpg" : output_file;
+
+    if (!stbi_write_jpg(path.c_str(), width, height, 1, image.data(), quality)) {
+        if (use_temp) { std::error_code ec; std::filesystem::remove(path, ec); }
+        throw std::runtime_error("Failed to write JPEG to '" + path + "'");
+    }
+
+    int w2 = 0, h2 = 0, channels = 0;
+    unsigned char* reloaded = stbi_load(path.c_str(), &w2, &h2, &channels, 1);
+    if (!reloaded) {
+        if (use_temp) { std::error_code ec; std::filesystem::remove(path, ec); }
+        throw std::runtime_error(std::string("Failed to reload JPEG: ") + stbi_failure_reason());
+    }
+
+    if (w2 != width || h2 != height) {
+        stbi_image_free(reloaded);
+        if (use_temp) { std::error_code ec; std::filesystem::remove(path, ec); }
+        throw std::runtime_error("jpegify: reloaded JPEG size mismatch");
+    }
+
+    std::vector<std::uint8_t> result;
+    result.reserve(static_cast<std::size_t>(w2) * static_cast<std::size_t>(h2));
+    result.insert(result.end(), reloaded, reloaded + (static_cast<std::size_t>(w2) * static_cast<std::size_t>(h2)));
+
+    stbi_image_free(reloaded);
+
+    if (use_temp) {
+        std::error_code ec;
+        std::filesystem::remove(path, ec);
+    }
+
+    return result;
 }
 
 double computeEntropyPerPixel(const std::vector<std::uint8_t>& image) {
