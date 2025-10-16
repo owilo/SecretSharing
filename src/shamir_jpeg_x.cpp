@@ -34,12 +34,12 @@ int main() {
     auto field = ss::BinaryField<std::uint8_t>(8);
 
     std::vector<std::vector<std::uint8_t>> x_sets = {
-        {1, 2, 3},
-        {1, 255, 254},
-        {1, 128, 129},
-        {1, 2, 128},
-        {1, 3, 5},
-        {85, 170, 255}
+        {1, 2, 3},     // Good
+        {1, 255, 254}, // Good
+        {1, 128, 129}, // Good
+        {1, 2, 128},   // Bad
+        {1, 3, 5},     // Bad
+        {85, 170, 255} // Good
     };
 
     const int jpeg_quality = 100;
