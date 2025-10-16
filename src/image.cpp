@@ -158,7 +158,7 @@ bool saveHistogram(std::string path, const std::array<unsigned, 256>& histogram)
     return true;
 }
 
-std::vector<std::uint8_t> medianFilter(const std::vector<std::uint8_t>& image, int width, int height, int filter_size) {
+std::vector<std::uint8_t> medianFilter(const std::vector<std::uint8_t>& image, int width, int height, int filter_size, bool circular) {
     if (width <= 0 || height <= 0) {
         throw std::invalid_argument("Width and height must be positive");
     }
@@ -179,6 +179,9 @@ std::vector<std::uint8_t> medianFilter(const std::vector<std::uint8_t>& image, i
             std::vector<std::uint8_t> neighborhood;
             for (int dy = -radius; dy <= radius; ++dy) {
                 for (int dx = -radius; dx <= radius; ++dx) {
+                    if (circular && (dx * dx + dy * dy > radius * radius)) {
+                        continue;
+                    }
                     int nx = x + dx;
                     int ny = y + dy;
                     if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
@@ -186,8 +189,12 @@ std::vector<std::uint8_t> medianFilter(const std::vector<std::uint8_t>& image, i
                     }
                 }
             }
-            std::nth_element(neighborhood.begin(), neighborhood.begin() + neighborhood.size() / 2, neighborhood.end());
-            filtered[y * width + x] = neighborhood[neighborhood.size() / 2];
+            if (!neighborhood.empty()) {
+                std::nth_element(neighborhood.begin(), neighborhood.begin() + neighborhood.size() / 2, neighborhood.end());
+                filtered[y * width + x] = neighborhood[neighborhood.size() / 2];
+            } else {
+                filtered[y * width + x] = image[y * width + x];
+            }
         }
     }
 

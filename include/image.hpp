@@ -31,7 +31,7 @@ std::vector<std::uint8_t> stretchHistogram(const std::vector<std::uint8_t>& imag
 
 std::array<unsigned, 256> computeHistogram(const std::vector<std::uint8_t>& image);
 
-std::vector<std::uint8_t> medianFilter(const std::vector<std::uint8_t>& image, int width, int height, int filter_size);
+std::vector<std::uint8_t> medianFilter(const std::vector<std::uint8_t>& image, int width, int height, int filter_size, bool circular = false);
 
 std::vector<std::uint8_t> jpegify(const std::vector<std::uint8_t>& image, int width, int height, int quality, std::string output_file = "");
 
