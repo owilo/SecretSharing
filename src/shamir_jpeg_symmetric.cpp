@@ -77,7 +77,8 @@ int main() {
         fs::create_directories(kdir + "/reconstructions");
         fs::create_directories(kdir + "/diff_maps");
 
-        auto shares = ss::getSharesSymmetric<std::uint8_t>(field_vec, k, n, field, kn);
+        auto shares = ss::getSharesSymmetric<std::uint8_t>(field_vec, k, n, field, static_cast<std::uint8_t>(center + 1), kn);
+        //auto shares = ss::getShares<std::uint8_t>(field_vec, k, n, field, kn);
         if (shares.size() != n) {
             std::cerr << "Warning: getSharesSymmetric returned " << shares.size() << " shares (expected " << n << ")\n";
         }
@@ -91,7 +92,7 @@ int main() {
 
         unsigned j = center;
         std::string jpeg_path = kdir + "/shadows_jpeg/shadow_" + std::to_string(j+1) + ".jpg";
-        comp_shares[j] = ss::jpegify(shares[j], width, height, jpeg_quality, kdir);
+        comp_shares[j] = ss::jpegify(shares[j], width, height, jpeg_quality, jpeg_path);
 
         std::cout << "Share " << (j+1)
             << " orig vs JPEG | PSNR = " << ss::computePSNR(shares[j], comp_shares[j])

@@ -241,22 +241,53 @@ std::vector<std::vector<Storage>> getSharesSymmetric(
     unsigned k,
     unsigned n,
     const Field<Storage>& F,
+    Storage a,
     unsigned kn,
     const std::vector<Storage>& evalPoints
 ) {
     if (n % 2 == 0) throw std::invalid_argument("n must be odd for symmetric shares");
     if (k % 2 == 0) throw std::invalid_argument("k must be odd for symmetric shares");
 
-    auto coeffGenerator = [](unsigned k, unsigned kn, std::mt19937_64& rng, std::uniform_int_distribution<std::uint64_t>& dist) {
+    auto binomial_u64 = [](unsigned n, unsigned r) -> std::uint64_t {
+        if (r > n) return 0;
+        unsigned kmin = (r > n - r) ? n - r : r;
+        std::uint64_t res = 1;
+        for (unsigned i = 1; i <= kmin; ++i) {
+            res = res * (n - kmin + i) / i;
+        }
+        return res;
+    };
+
+    auto coeffGenerator = [a, &binomial_u64](unsigned k, unsigned /*kn*/, std::mt19937_64& rng, std::uniform_int_distribution<std::uint64_t>& dist) {
         std::vector<Storage> polyCoeffs(k, static_cast<Storage>(0));
 
         unsigned num_coeffs = (k + 1) / 2;
 
-        // Generate random coefficients for even powers only
+        std::vector<Storage> c(num_coeffs, static_cast<Storage>(0));
+        for (unsigned j = 0; j < num_coeffs; ++j) {
+            c[j] = static_cast<Storage>(dist(rng));
+        }
+
         for (unsigned j = 0; j < num_coeffs; ++j) {
             unsigned power = 2 * j;
-            if (power < k) {
-                polyCoeffs[power] = static_cast<Storage>(dist(rng));
+            Storage cj = c[j];
+
+            for (unsigned r = 0; r <= power && r < k; ++r) {
+                std::uint64_t bin = binomial_u64(power, r);
+                Storage term = cj * static_cast<Storage>(bin);
+
+                unsigned exp = power - r;
+                Storage a_pow = static_cast<Storage>(1);
+                for (unsigned e = 0; e < exp; ++e) {
+                    a_pow = a_pow * a;
+                }
+                if ((exp & 1u) == 1u) {
+                    a_pow = static_cast<Storage>(0) - a_pow;
+                }
+
+                term = term * a_pow;
+
+                polyCoeffs[r] = polyCoeffs[r] + term;
             }
         }
 
@@ -405,9 +436,9 @@ template std::vector<std::vector<std::uint8_t>> getShares<std::uint8_t>(const st
 template std::vector<std::vector<std::uint16_t>> getShares<std::uint16_t>(const std::vector<std::uint16_t>&, unsigned, unsigned, const Field<std::uint16_t>&, unsigned, const std::vector<std::uint16_t>&);
 template std::vector<std::vector<std::uint32_t>> getShares<std::uint32_t>(const std::vector<std::uint32_t>&, unsigned, unsigned, const Field<std::uint32_t>&, unsigned, const std::vector<std::uint32_t>&);
 
-template std::vector<std::vector<std::uint8_t>> getSharesSymmetric<std::uint8_t>(const std::vector<std::uint8_t>&, unsigned, unsigned, const Field<std::uint8_t>&, unsigned, const std::vector<std::uint8_t>&);
-template std::vector<std::vector<std::uint16_t>> getSharesSymmetric<std::uint16_t>(const std::vector<std::uint16_t>&, unsigned, unsigned, const Field<std::uint16_t>&, unsigned, const std::vector<std::uint16_t>&);
-template std::vector<std::vector<std::uint32_t>> getSharesSymmetric<std::uint32_t>(const std::vector<std::uint32_t>&, unsigned, unsigned, const Field<std::uint32_t>&, unsigned, const std::vector<std::uint32_t>&);
+template std::vector<std::vector<std::uint8_t>> getSharesSymmetric<std::uint8_t>(const std::vector<std::uint8_t>&, unsigned, unsigned, const Field<std::uint8_t>&, std::uint8_t a, unsigned, const std::vector<std::uint8_t>&);
+template std::vector<std::vector<std::uint16_t>> getSharesSymmetric<std::uint16_t>(const std::vector<std::uint16_t>&, unsigned, unsigned, const Field<std::uint16_t>&, std::uint16_t a, unsigned, const std::vector<std::uint16_t>&);
+template std::vector<std::vector<std::uint32_t>> getSharesSymmetric<std::uint32_t>(const std::vector<std::uint32_t>&, unsigned, unsigned, const Field<std::uint32_t>&, std::uint32_t a, unsigned, const std::vector<std::uint32_t>&);
 
 template std::vector<std::uint8_t> reconstructFromShares<std::uint8_t>(const std::vector<std::vector<std::uint8_t>>&, const std::vector<std::uint8_t>&, unsigned, const Field<std::uint8_t>&, unsigned, std::size_t);
 template std::vector<std::uint16_t> reconstructFromShares<std::uint16_t>(const std::vector<std::vector<std::uint16_t>>&, const std::vector<std::uint16_t>&, unsigned, const Field<std::uint16_t>&, unsigned, std::size_t);
