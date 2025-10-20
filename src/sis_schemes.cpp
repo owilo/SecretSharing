@@ -34,8 +34,10 @@ void runScheme(const std::string &label,
     if (clampToField) {
         field_vec = ss::clampPixels(secret_vec, 0, static_cast<std::uint8_t>(field.getOrder() - 1));
     } else {
-        field_vec = ss::stretchHistogram(secret_vec, 0, 255, 0, field.getOrder() - 1);
+        field_vec = ss::stretchHistogram(secret_vec, 0, 255, 0, static_cast<std::uint8_t>(field.getOrder() - 1));
     }
+
+    ss::saveHistogram(result_prefix + "/histogram.dat", ss::computeHistogram(field_vec));
 
     auto shares = ss::getShares<std::uint8_t>(field_vec, k, n, field, kn);
     if (shares.size() != n) {
@@ -62,11 +64,14 @@ void runScheme(const std::string &label,
     auto reconstructAndSave = [&](const std::vector<unsigned>& indices, const std::string& out_path, unsigned rec_k){
         auto [selectedShares, selectedXs] = ss::selectSharesAndEvalPoints(indices, shares);
         auto rec = ss::reconstructFromShares<std::uint8_t>(selectedShares, selectedXs, rec_k, field, kn, static_cast<unsigned>(secret_size));
+
+        if (!clampToField) {
+            rec = ss::stretchHistogram(rec, 0, static_cast<std::uint8_t>(field.getOrder() - 1), 0, 255);
+        }
+
         ss::saveGrayscalePNG(out_path, rec, width, height);
         return rec;
     };
-
-    ss::saveHistogram(result_prefix + "/histogram.dat", ss::computeHistogram(field_vec));
 
     std::string recA_path = result_prefix + "/reconstruction1.png";
     auto recA = reconstructAndSave(idxA, recA_path, k);
@@ -98,7 +103,7 @@ void runScheme(const std::string &label,
 }
 
 int main() {
-    const std::string input_path = "images/input.png";
+    const std::string input_path = "images/stop.png";
     auto [secret_pixels, width, height] = ss::readGrayscalePNG(input_path);
     size_t secret_size = secret_pixels.size();
     std::cout << "Loaded secret image '" << input_path << "' (" << width << "x" << height << "), bytes: " << secret_size << "\n";
