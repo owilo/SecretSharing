@@ -12,3 +12,6 @@ shamir_jpeg_x: src/secret.cpp src/image.cpp src/shamir_jpeg_x.cpp
 
 shamir_jpeg_median: src/secret.cpp src/image.cpp src/shamir_jpeg_median.cpp
 	g++ src/secret.cpp src/image.cpp src/shamir_jpeg_median.cpp -o shamir_jpeg_median -O3 -Iinclude -Ilib/include -std=c++20
+
+jpeg_quality_factor: src/secret.cpp src/image.cpp src/jpeg_quality_factor.cpp
+	g++ src/secret.cpp src/image.cpp src/jpeg_quality_factor.cpp -o jpeg_quality_factor -O3 -Iinclude -Ilib/include -std=c++20
