@@ -1,4 +1,4 @@
-#include "secret.hpp"
+#include "ss/secret.hpp"
 
 namespace ss {
 

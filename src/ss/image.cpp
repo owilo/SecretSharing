@@ -1,7 +1,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 
-#include "image.hpp"
+#include "ss/image.hpp"
 
 namespace ss {
 

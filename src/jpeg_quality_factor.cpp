@@ -6,7 +6,7 @@
 #include <fstream>
 #include <map>
 
-#include "image.hpp"
+#include "ss/image.hpp"
 
 namespace fs = std::filesystem;
 

@@ -8,8 +8,8 @@
 #include <cmath>
 #include <limits>
 
-#include "secret.hpp"
-#include "image.hpp"
+#include "ss/secret.hpp"
+#include "ss/image.hpp"
 
 namespace fs = std::filesystem;
 
