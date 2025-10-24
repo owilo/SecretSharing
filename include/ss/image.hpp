@@ -47,4 +47,6 @@ double computeNPCR(const std::vector<std::uint8_t>& orig, const std::vector<std:
 
 double computeUACI(const std::vector<std::uint8_t>& orig, const std::vector<std::uint8_t>& recon);
 
+double computeEntropy(const std::vector<std::uint8_t>& image);
+
 } // namespace ss

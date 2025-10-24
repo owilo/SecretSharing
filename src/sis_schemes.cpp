@@ -59,7 +59,8 @@ static void printMetrics(const std::string& path, const std::vector<std::uint8_t
     std::cout << "  " << path
               << " | PSNR : " << ss::computePSNR(secret, rec) << " dB"
               << " | NPCR : " << ss::computeNPCR(secret, rec) << "%"
-              << " | UACI : " << ss::computeUACI(secret, rec) << "%\n";
+              << " | UACI : " << ss::computeUACI(secret, rec) << "%"
+              << " | Entropy: " << ss::computeEntropy(rec) << " bits/pixel\n";
 }
 
 static void warnShareCount(std::size_t got, std::size_t expect) {

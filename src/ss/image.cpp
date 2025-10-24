@@ -321,4 +321,21 @@ double computeUACI(const std::vector<std::uint8_t>& orig, const std::vector<std:
     return (total_diff / (static_cast<double>(n) * 255.0)) * 100.0;
 }
 
+double computeEntropy(const std::vector<std::uint8_t>& image) {
+    auto hist = computeHistogram(image);
+    const double total = static_cast<double>(image.size());
+    if (total == 0.0) {
+        return 0.0;
+    }
+
+    double entropy = 0.0;
+    for (const auto &count : hist) {
+        if (count > 0) {
+            double p = static_cast<double>(count) / total;
+            entropy -= p * std::log2(p);
+        }
+    }
+    return entropy;
+}
+
 } // namespace ss
