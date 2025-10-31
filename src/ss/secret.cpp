@@ -1,12 +1,14 @@
 #include "ss/secret.hpp"
 
+#include <algorithm>
+#include <numeric>
+#include <unordered_set>
+#include <limits>
+#include <random>
+
 namespace ss {
 
-static constexpr std::uint64_t irr[32] = {
-    0x3, 0x7, 0xb, 0x13, 0x25, 0x43, 0x83, 0x11b, 0x203, 0x409, 0x805, 0x1009, 0x201b, 0x4021, 0x8003, 0x1002b, 0x20003, 0x40009, 0x80027, 0x100009, 0x200005, 0x400003, 0x800021, 0x100001b, 0x2000009, 0x400001b, 0x8000027, 0x10000003, 0x20000005, 0x40000003, 0x80000009, 0x10000008d
-};
-
-// Field definitions
+// Field helper implementations
 
 template<typename Storage>
 typename Field<Storage>::storage_type Field<Storage>::evaluatePolynomial(const std::vector<storage_type>& coefficients, storage_type x) const {
@@ -30,7 +32,7 @@ std::vector<typename Field<Storage>::storage_type> Field<Storage>::mul_by_x_minu
     return out;
 }
 
-// PrimeField definitions
+// PrimeField
 
 template<typename Storage>
 PrimeField<Storage>::PrimeField(std::uint64_t prime) : p(prime) {
@@ -76,7 +78,7 @@ typename PrimeField<Storage>::storage_type PrimeField<Storage>::inv(storage_type
     return pow(a, p - 2);
 }
 
-// BinaryField definitions
+// BinaryField
 
 template<typename Storage>
 BinaryField<Storage>::BinaryField(unsigned m_deg)
@@ -87,6 +89,11 @@ BinaryField<Storage>::BinaryField(unsigned m_deg)
 template<typename Storage>
 typename BinaryField<Storage>::storage_type BinaryField<Storage>::add(storage_type a, storage_type b) const noexcept {
     return static_cast<storage_type>(a ^ b);
+}
+
+template<typename Storage>
+typename BinaryField<Storage>::storage_type BinaryField<Storage>::sub(storage_type a, storage_type b) const noexcept {
+    return add(a, b);
 }
 
 template<typename Storage>
@@ -129,7 +136,7 @@ typename BinaryField<Storage>::storage_type BinaryField<Storage>::inv(storage_ty
     return pow(a, e);
 }
 
-// Secret sharing
+// getShares helper & wrappers
 
 template<typename Storage, typename CoeffGenerator>
 static std::vector<std::vector<Storage>> getSharesHelper(
@@ -298,11 +305,56 @@ std::vector<std::vector<Storage>> getSharesSymmetric(
 }
 
 template<typename Storage>
+std::vector<Storage> lagrangeBasisCoeffs(
+    const std::vector<Storage>& xs,
+    unsigned index,
+    const Field<Storage>& F
+) {
+    if (xs.empty()) throw std::invalid_argument("xs must be non-empty");
+    if (index >= xs.size()) throw std::out_of_range("index out of range");
+
+    std::vector<Storage> poly(1, static_cast<Storage>(1));
+    for (unsigned l = 0; l < xs.size(); ++l) {
+        if (l == index) continue;
+        poly = F.mul_by_x_minus_a(poly, xs[l]);
+    }
+
+    Storage denom = static_cast<Storage>(1);
+    for (unsigned l = 0; l < xs.size(); ++l) {
+        if (l == index) continue;
+        Storage diff = F.sub(xs[index], xs[l]);
+        denom = F.mul(denom, diff);
+    }
+
+    if (denom == static_cast<Storage>(0)) {
+        throw std::runtime_error("Singular denominator in Lagrange basis (duplicate x?)");
+    }
+
+    Storage invDenom = F.inv(denom);
+
+    for (size_t j = 0; j < poly.size(); ++j) {
+        poly[j] = F.mul(poly[j], invDenom);
+    }
+
+    return poly;
+}
+
+template<typename Storage>
+Storage evaluateLagrangeBasisAt(
+    const std::vector<Storage>& xs,
+    unsigned index,
+    Storage x,
+    const Field<Storage>& F
+) {
+    return F.evaluatePolynomial(lagrangeBasisCoeffs<Storage>(xs, index, F), x);
+}
+
+template<typename Storage>
 std::vector<Storage> reconstructFromShares(
     const std::vector<std::vector<Storage>>& shares,
     const std::vector<Storage>& evalPoints,
     unsigned k,
-    const Field<Storage>& F, 
+    const Field<Storage>& F,
     unsigned kn,
     std::size_t expected_size
 ) {
@@ -330,29 +382,14 @@ std::vector<Storage> reconstructFromShares(
     for (unsigned block = 0; block < shareSize; ++block) {
         std::vector<Storage> coeffs(k, static_cast<Storage>(0));
 
-        for (unsigned m_idx = 0; m_idx < k; ++m_idx) {
-            Storage x_m = xs[m_idx];
-            Storage y_m = shares[m_idx][block];
+        for (unsigned index = 0; index < k; ++index) {
+            Storage y_m = shares[index][block];
 
-            std::vector<Storage> poly(1, static_cast<Storage>(1));
-            Storage denom = static_cast<Storage>(1);
+            auto basis = lagrangeBasisCoeffs<Storage>(xs, index, F);
 
-            // Build Lagrange basis polynomial and denominator
-            for (unsigned l = 0; l < k; ++l) {
-                if (l == m_idx) continue;
-                poly = F.mul_by_x_minus_a(poly, xs[l]);
-                Storage diff = F.sub(x_m, xs[l]);
-                denom = F.mul(denom, diff);
-            }
-
-            if (denom == 0) throw std::runtime_error("Singular denominator in Lagrange basis (duplicate x?)");
-
-            Storage invDenom = F.inv(denom);
-            Storage scale = F.mul(y_m, invDenom);
-
-            // Accumulate the scaled basis polynomial
-            for (size_t j = 0; j < poly.size(); ++j) {
-                Storage addv = F.mul(scale, poly[j]);
+            // Add y_m * basis to coeffs
+            for (size_t j = 0; j < basis.size(); ++j) {
+                Storage addv = F.mul(y_m, basis[j]);
                 coeffs[j] = F.add(coeffs[j], addv);
             }
         }
@@ -414,7 +451,7 @@ std::pair<std::vector<std::vector<Storage>>, std::vector<Storage>> selectSharesA
     return {selected_shares, selected_evalPoints};
 }
 
-// Template instantiations
+// Explicit template instantiations
 
 // Field base class instantiations
 template struct Field<std::uint8_t>;
@@ -447,5 +484,13 @@ template std::vector<std::uint32_t> reconstructFromShares<std::uint32_t>(const s
 template std::pair<std::vector<std::vector<std::uint8_t>>, std::vector<std::uint8_t>> selectSharesAndEvalPoints(const std::vector<unsigned>& indices, const std::vector<std::vector<std::uint8_t>>& shares, const std::vector<std::uint8_t>& evalPoints);
 template std::pair<std::vector<std::vector<std::uint16_t>>, std::vector<std::uint16_t>> selectSharesAndEvalPoints(const std::vector<unsigned>& indices, const std::vector<std::vector<std::uint16_t>>& shares, const std::vector<std::uint16_t>& evalPoints);
 template std::pair<std::vector<std::vector<std::uint32_t>>, std::vector<std::uint32_t>> selectSharesAndEvalPoints(const std::vector<unsigned>& indices, const std::vector<std::vector<std::uint32_t>>& shares, const std::vector<std::uint32_t>& evalPoints);
+
+template std::vector<std::uint8_t> lagrangeBasisCoeffs<std::uint8_t>(const std::vector<std::uint8_t>&, unsigned, const Field<std::uint8_t>&);
+template std::vector<std::uint16_t> lagrangeBasisCoeffs<std::uint16_t>(const std::vector<std::uint16_t>&, unsigned, const Field<std::uint16_t>&);
+template std::vector<std::uint32_t> lagrangeBasisCoeffs<std::uint32_t>(const std::vector<std::uint32_t>&, unsigned, const Field<std::uint32_t>&);
+
+template std::uint8_t evaluateLagrangeBasisAt<std::uint8_t>(const std::vector<std::uint8_t>&, unsigned, std::uint8_t, const Field<std::uint8_t>&);
+template std::uint16_t evaluateLagrangeBasisAt<std::uint16_t>(const std::vector<std::uint16_t>&, unsigned, std::uint16_t, const Field<std::uint16_t>&);
+template std::uint32_t evaluateLagrangeBasisAt<std::uint32_t>(const std::vector<std::uint32_t>&, unsigned, std::uint32_t, const Field<std::uint32_t>&);
 
 } // namespace ss
