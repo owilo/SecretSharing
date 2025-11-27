@@ -204,7 +204,7 @@ std::vector<std::uint8_t> medianFilter(const std::vector<std::uint8_t>& image, i
 // TODO : use in-memory operations if possible
 std::vector<std::uint8_t> jpegify(const std::vector<std::uint8_t>& image, int width, int height, int quality, std::string output_file) {
     if (image.empty()) {
-        throw std::invalid_argument("jInput image is empty");
+        throw std::invalid_argument("Input image is empty");
     }
     if (width <= 0 || height <= 0) {
         throw std::invalid_argument("Width and height must be positive");

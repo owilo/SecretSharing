@@ -14,12 +14,12 @@
 namespace fs = std::filesystem;
 
 int main() {
-    const std::string input_path = "images/input.png";
+    const std::string input_path = "images/baboon.png";
     auto [secret_pixels, width, height] = ss::readGrayscalePNG(input_path);
     size_t secret_size = secret_pixels.size();
     std::cout << "Loaded secret image '" << input_path << "' (" << width << "x" << height << "), bytes: " << secret_size << "\n";
 
-    const unsigned n = 6;
+    const unsigned n = 5;
     const unsigned k = 3;
     const unsigned kn = 1;
 
@@ -52,7 +52,7 @@ int main() {
 
     std::vector<std::vector<std::uint8_t>> comp_shares = shares;
 
-    std::vector<unsigned> noisy_indices = {2u, 3u, 4u, 5u};
+    std::vector<unsigned> noisy_indices = {2u, 3u, 4u};
 
     for (unsigned j_idx = 0; j_idx < noisy_indices.size(); ++j_idx) {
         unsigned j = noisy_indices[j_idx];
@@ -71,19 +71,27 @@ int main() {
         ss::saveGrayscalePNG(diff_path, diff_map, width, height);
     }
 
-    for (unsigned noisy : noisy_indices) {
-        std::vector<unsigned> indices = {0u, 1u, noisy};
+    std::vector<std::array<unsigned,3>> combos = {
+        {0u, 1u, 2u},
+        {0u, 1u, 3u},
+        {0u, 1u, 4u},
+        {0u, 3u, 4u},
+        {1u, 3u, 4u}
+    };
+
+    for (const auto &combo : combos) {
+        std::vector<unsigned> indices = {combo[0], combo[1], combo[2]};
         auto [selectedShares, selectedXs] = ss::selectSharesAndEvalPoints(indices, comp_shares);
 
         auto rec = ss::reconstructFromShares<std::uint8_t>(selectedShares, selectedXs, k, field, kn, static_cast<unsigned>(secret_size));
 
-        std::string rec_path = out_base + "/reconstructions/reconstruction_0_1_" + std::to_string(noisy+1) + ".png";
+        std::string rec_path = out_base + "/reconstructions/reconstruction_";
+        rec_path += std::to_string(indices[0]+1) + "_" + std::to_string(indices[1]+1) + "_" + std::to_string(indices[2]+1) + ".png";
         ss::saveGrayscalePNG(rec_path, rec, width, height);
 
-        std::cout << "Reconstruction using shares (0,1," << (noisy+1) << ") | PSNR: " << ss::computePSNR(field_vec, rec) << " dB | NPCR: " << ss::computeNPCR(field_vec, rec) << "% | UACI: " << ss::computeUACI(field_vec, rec) << "%\n";
+        std::cout << "Reconstruction using shares (" << (indices[0]+1) << "," << (indices[1]+1) << "," << (indices[2]+1) << ") | PSNR: " << ss::computePSNR(field_vec, rec) << " dB | NPCR: " << ss::computeNPCR(field_vec, rec) << "% | UACI: " << ss::computeUACI(field_vec, rec) << "%\n";
 
-        std::string rec_diff = out_base + "/diff_maps/diff_reconstruction_0_1_" + std::to_string(noisy+1) + ".png";
-        
+        std::string rec_diff = out_base + "/diff_maps/diff_reconstruction_" + std::to_string(indices[0]+1) + "_" + std::to_string(indices[1]+1) + "_" + std::to_string(indices[2]+1) + ".png";
         std::vector<std::uint8_t> diff_map = ss::generateDiffMap(field_vec, rec, width, height);
         ss::saveGrayscalePNG(rec_diff, diff_map, width, height);
     }
