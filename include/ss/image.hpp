@@ -23,7 +23,7 @@ namespace ss {
 
 std::pair<int, int> saveGrayscalePNG(const std::filesystem::path& path, std::span<const std::uint8_t> pixels, int w, int h);
 
-std::tuple<std::vector<std::uint8_t>, int, int> readGrayscalePNG(const std::filesystem::path& path);
+std::tuple<std::vector<std::uint8_t>, int, int> readGrayscale(const std::filesystem::path& path);
 
 std::vector<std::uint8_t> generateDiffMap(const std::vector<std::uint8_t>& orig, const std::vector<std::uint8_t>& recon, int width, int height);
     

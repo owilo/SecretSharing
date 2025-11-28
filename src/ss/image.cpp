@@ -24,7 +24,7 @@ std::pair<int, int> saveGrayscalePNG(const std::filesystem::path& path, std::spa
     return {w, h};
 }
 
-std::tuple<std::vector<std::uint8_t>, int, int> readGrayscalePNG(const std::filesystem::path& path) {
+std::tuple<std::vector<std::uint8_t>, int, int> readGrayscale(const std::filesystem::path& path) {
     int w = 0, h = 0, channels = 0;
     std::uint8_t *data = stbi_load(path.string().c_str(), &w, &h, &channels, 1);
     if (!data) {

@@ -23,7 +23,7 @@ void printMetrics(const std::vector<std::uint8_t>& image1, const std::vector<std
 
 int main() {
     const std::string input_path = "images/input.png";
-    auto [secret_pixels, width, height] = ss::readGrayscalePNG(input_path);
+    auto [secret_pixels, width, height] = ss::readGrayscale(input_path);
     size_t secret_size = secret_pixels.size();
 
     const unsigned n = 11;

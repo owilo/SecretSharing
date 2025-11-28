@@ -360,7 +360,7 @@ void runScheme(
 
 int main(int argc, char* argv[]) {
     const std::string input_path = "images/stop.png";
-    auto [secret_pixels, width, height] = ss::readGrayscalePNG(input_path);
+    auto [secret_pixels, width, height] = ss::readGrayscale(input_path);
     std::size_t secret_size = secret_pixels.size();
 
     const unsigned n = 6;
