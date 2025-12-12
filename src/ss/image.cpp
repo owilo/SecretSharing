@@ -223,7 +223,12 @@ std::vector<std::uint8_t> medianFilter(const std::vector<std::uint8_t>& image, i
     return filtered;
 }
 
-// TODO : use in-memory operations if possible
+static void stbi_write_to_vector(void* context, void* data, int size) {
+    auto* buf = static_cast<std::vector<std::uint8_t>*>(context);
+    auto* bytes = static_cast<unsigned char*>(data);
+    buf->insert(buf->end(), bytes, bytes + size);
+}
+
 std::vector<std::uint8_t> jpegify(const std::vector<std::uint8_t>& image, int width, int height, int quality, std::string output_file) {
     if (image.empty()) {
         throw std::invalid_argument("Input image is empty");
@@ -239,24 +244,35 @@ std::vector<std::uint8_t> jpegify(const std::vector<std::uint8_t>& image, int wi
         throw std::invalid_argument("Input image size does not match width*height");
     }
 
-    const bool use_temp = output_file.empty();
-    std::string path = use_temp ? "tmp/tmp.jpg" : output_file;
+    const int comp = 1;
 
-    if (!stbi_write_jpg(path.c_str(), width, height, 1, image.data(), quality)) {
-        if (use_temp) { std::error_code ec; std::filesystem::remove(path, ec); }
-        throw std::runtime_error("Failed to write JPEG to '" + path + "'");
+    std::vector<std::uint8_t> jpeg_buf;
+    jpeg_buf.reserve(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) / 2);
+
+    int write_ok = stbi_write_jpg_to_func(stbi_write_to_vector, &jpeg_buf, width, height, comp, image.data(), quality);
+    if (!write_ok || jpeg_buf.empty()) {
+        throw std::runtime_error("Failed to encode JPEG to memory");
+    }
+
+    if (!output_file.empty()) {
+        std::ofstream ofs(output_file, std::ios::binary);
+        if (!ofs) {
+            throw std::runtime_error("Failed to open output file for writing: " + output_file);
+        }
+        ofs.write(reinterpret_cast<const char*>(jpeg_buf.data()), static_cast<std::streamsize>(jpeg_buf.size()));
+        if (!ofs) {
+            throw std::runtime_error("Failed to write jpeg bytes to file: " + output_file);
+        }
     }
 
     int w2 = 0, h2 = 0, channels = 0;
-    unsigned char* reloaded = stbi_load(path.c_str(), &w2, &h2, &channels, 1);
+    unsigned char* reloaded = stbi_load_from_memory(jpeg_buf.data(), static_cast<int>(jpeg_buf.size()), &w2, &h2, &channels, comp);
     if (!reloaded) {
-        if (use_temp) { std::error_code ec; std::filesystem::remove(path, ec); }
-        throw std::runtime_error(std::string("Failed to reload JPEG: ") + stbi_failure_reason());
+        throw std::runtime_error(std::string("Failed to reload JPEG from memory: ") + (stbi_failure_reason() ? stbi_failure_reason() : "unknown"));
     }
 
     if (w2 != width || h2 != height) {
         stbi_image_free(reloaded);
-        if (use_temp) { std::error_code ec; std::filesystem::remove(path, ec); }
         throw std::runtime_error("jpegify: reloaded JPEG size mismatch");
     }
 
@@ -265,11 +281,6 @@ std::vector<std::uint8_t> jpegify(const std::vector<std::uint8_t>& image, int wi
     result.insert(result.end(), reloaded, reloaded + (static_cast<std::size_t>(w2) * static_cast<std::size_t>(h2)));
 
     stbi_image_free(reloaded);
-
-    if (use_temp) {
-        std::error_code ec;
-        std::filesystem::remove(path, ec);
-    }
 
     return result;
 }
