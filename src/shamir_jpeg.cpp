@@ -7,6 +7,7 @@
 #include <numeric>
 #include <cmath>
 #include <limits>
+#include <array>
 
 #include "ss/secret.hpp"
 #include "ss/image.hpp"
@@ -29,12 +30,14 @@ int main() {
     fs::create_directories(out_base + "/shadows_jpeg");
     fs::create_directories(out_base + "/reconstructions");
     fs::create_directories(out_base + "/diff_maps");
+    fs::create_directories(out_base + "/noise_masks");
 
-    auto field = ss::BinaryField<std::uint8_t>(8);
+    //auto field = ss::BinaryField<std::uint8_t>(8);
+    auto field = ss::PrimeField<std::uint8_t>(251);
 
     // may be useless here
-    //std::vector<std::uint8_t> field_vec = ss::clampPixels(secret_pixels, 0, static_cast<std::uint8_t>(field.getOrder()-1));
-    std::vector<std::uint8_t> field_vec = secret_pixels;
+    std::vector<std::uint8_t> field_vec = ss::clampPixels(secret_pixels, 0, static_cast<std::uint8_t>(field.getOrder() - 1));
+    //std::vector<std::uint8_t> field_vec = secret_pixels;
 
     auto shares = ss::getShares<std::uint8_t>(field_vec, k, n, field, kn);
     if (shares.size() != n) {
@@ -52,7 +55,7 @@ int main() {
 
     std::vector<std::vector<std::uint8_t>> comp_shares = shares;
 
-    std::vector<unsigned> noisy_indices = {2u, 3u, 4u};
+    std::vector<unsigned> noisy_indices = {0u, 1u, 3u};
 
     for (unsigned j_idx = 0; j_idx < noisy_indices.size(); ++j_idx) {
         unsigned j = noisy_indices[j_idx];
@@ -76,7 +79,8 @@ int main() {
         {0u, 1u, 3u},
         {0u, 1u, 4u},
         {0u, 3u, 4u},
-        {1u, 3u, 4u}
+        {1u, 3u, 4u},
+        {2u, 3u, 4u}
     };
 
     for (const auto &combo : combos) {
@@ -85,11 +89,55 @@ int main() {
 
         auto rec = ss::reconstructFromShares<std::uint8_t>(selectedShares, selectedXs, k, field, kn, static_cast<unsigned>(secret_size));
 
+        std::size_t corrected_pixels = 0;
+        std::size_t total_noised_pixels = 0;
+
+        std::vector<std::uint8_t> color_mask(secret_size * 3, 255);
+
+        for (size_t p = 0; p < secret_size; ++p) {
+            bool any_noised = false;
+            for (unsigned idx : indices) {
+                if (comp_shares[idx][p] != shares[idx][p]) {
+                    any_noised = true;
+                    break;
+                }
+            }
+
+            if (!any_noised) {
+                continue;
+            }
+
+            ++total_noised_pixels;
+
+            std::size_t off = p * 3;
+            if (rec[p] == field_vec[p]) {
+                ++corrected_pixels;
+                color_mask[off + 0] = 0;   // R
+                color_mask[off + 1] = 220; // G
+                color_mask[off + 2] = 0;   // B
+            } else {
+                color_mask[off + 0] = 255; // R
+                color_mask[off + 1] = 160;   // G
+                color_mask[off + 2] = 160;   // B
+            }
+        }
+
+        std::string mask_path = out_base + "/noise_masks/mask_"
+            + std::to_string(indices[0]+1) + "_"
+            + std::to_string(indices[1]+1) + "_"
+            + std::to_string(indices[2]+1) + ".png";
+
+        ss::savePNG(mask_path, std::span<const std::uint8_t>(color_mask.data(), color_mask.size()), width, height);
+
+        double pct_corrected_total = 100.0 * static_cast<double>(corrected_pixels) / static_cast<double>(secret_size);
+        double pct_corrected_noised = total_noised_pixels > 0 ? 100.0 * static_cast<double>(corrected_pixels) / static_cast<double>(total_noised_pixels) : 0.0;
+
+
         std::string rec_path = out_base + "/reconstructions/reconstruction_";
         rec_path += std::to_string(indices[0]+1) + "_" + std::to_string(indices[1]+1) + "_" + std::to_string(indices[2]+1) + ".png";
         ss::saveGrayscalePNG(rec_path, rec, width, height);
 
-        std::cout << "Reconstruction using shares (" << (indices[0]+1) << "," << (indices[1]+1) << "," << (indices[2]+1) << ") | PSNR: " << ss::computePSNR(field_vec, rec) << " dB | NPCR: " << ss::computeNPCR(field_vec, rec) << "% | UACI: " << ss::computeUACI(field_vec, rec) << "%\n";
+        std::cout << "Reconstruction using shares (" << (indices[0]+1) << "," << (indices[1]+1) << "," << (indices[2]+1) << ") | PSNR: " << ss::computePSNR(field_vec, rec) << " dB | NPCR: " << ss::computeNPCR(field_vec, rec) << "% | UACI: " << ss::computeUACI(field_vec, rec) << "% | CP/T: " << pct_corrected_total << "% | " << "CP/N: " << pct_corrected_noised << "%\n";
 
         std::string rec_diff = out_base + "/diff_maps/diff_reconstruction_" + std::to_string(indices[0]+1) + "_" + std::to_string(indices[1]+1) + "_" + std::to_string(indices[2]+1) + ".png";
         std::vector<std::uint8_t> diff_map = ss::generateDiffMap(field_vec, rec, width, height);
