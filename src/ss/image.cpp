@@ -24,6 +24,28 @@ std::pair<int, int> saveGrayscalePNG(const std::filesystem::path& path, std::spa
     return {w, h};
 }
 
+std::pair<int, int> savePNG(const std::filesystem::path& path, std::span<const std::uint8_t> pixels, int w, int h) {
+    if (w <= 0 || h <= 0) {
+        throw std::invalid_argument("savePNG: width and height must be positive");
+    }
+
+    const std::size_t expected = static_cast<std::size_t>(w) * static_cast<std::size_t>(h) * 3;
+    if (pixels.size() != expected) {
+        std::ostringstream oss;
+        oss << "savePNG: pixel buffer size (" << pixels.size() << ") != w * h * 3 (" << expected << ")";
+        throw std::invalid_argument(oss.str());
+    }
+
+    const int channels = 3;
+    const int stride_bytes = w * channels;
+
+    if (stbi_write_png(path.string().c_str(), w, h, channels, pixels.data(), stride_bytes) == 0) {
+        throw std::runtime_error("savePNG: stbi_write_png failed for " + path.string());
+    }
+
+    return {w, h};
+}
+
 std::tuple<std::vector<std::uint8_t>, int, int> readGrayscale(const std::filesystem::path& path) {
     int w = 0, h = 0, channels = 0;
     std::uint8_t *data = stbi_load(path.string().c_str(), &w, &h, &channels, 1);
